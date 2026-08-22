@@ -19,7 +19,7 @@ const formatBytes = (bytes: number, decimals = 2) => {
 };
 
 const formatETA = (seconds: number) => {
-  if (!seconds) return '∞';
+  if (!seconds || seconds < 0 || seconds > 31536000) return '∞';
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   const s = seconds % 60;
