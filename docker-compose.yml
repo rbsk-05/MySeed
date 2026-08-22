@@ -1,0 +1,37 @@
+version: "3.8"
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: torrent_backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./downloads:/downloads
+      - ./data:/data
+    environment:
+      - DOWNLOAD_DIR=/downloads
+      - DATABASE_URL=sqlite:////data/torrent_downloader.db
+      - SECRET_KEY=change_this_to_a_secure_random_string_in_production
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: torrent_frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: torrent_tunnel
+    command: tunnel --url http://frontend:80
+    restart: unless-stopped
+    depends_on:
+      - frontend
