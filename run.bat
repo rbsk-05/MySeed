@@ -38,22 +38,10 @@ echo  Backend is running at http://localhost:8000
 echo ==================================================
 echo.
 
-:: Ask for public link
-set /p choice="Do you want to generate a public link to access it from anywhere? (y/n): "
-if /I "%choice%"=="y" goto start_tunnel
-goto wait_exit
-
-:start_tunnel
-echo [INFO] Starting Localtunnel on port 8000...
+:: Automatically generate a public link
+echo [INFO] Generating public access link via Localtunnel...
 echo.
 echo --------------------------------------------------
 echo Copy the public URL generated below to your devices!
 echo --------------------------------------------------
 npx localtunnel --port 8000
-exit /b
-
-:wait_exit
-echo.
-echo Press any key to stop the server and exit launcher...
-pause > nul
-taskkill /FI "WINDOWTITLE eq Torrent Downloader Backend*" /F > nul 2>&1
