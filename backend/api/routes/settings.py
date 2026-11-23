@@ -3,7 +3,6 @@ from sqlalchemy.orm import Session
 from backend.database.session import get_db
 from backend.models.settings import Settings
 from backend.schemas.settings import SettingsUpdate, SettingsResponse
-from backend.api.dependencies import get_current_user
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -17,14 +16,13 @@ def get_or_create_settings(db: Session) -> Settings:
     return settings
 
 @router.get("", response_model=SettingsResponse)
-def get_settings(db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+def get_settings(db: Session = Depends(get_db)):
     return get_or_create_settings(db)
 
 @router.put("", response_model=SettingsResponse)
 def update_settings(
     settings_in: SettingsUpdate,
-    db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    db: Session = Depends(get_db)
 ):
     settings = get_or_create_settings(db)
     settings.download_dir = settings_in.download_dir

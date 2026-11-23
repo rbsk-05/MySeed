@@ -1,21 +1,29 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Server } from 'lucide-react';
+import { Plus, Server, ArrowDown, ArrowUp, DownloadCloud } from 'lucide-react';
 import { getTorrents, addMagnet, uploadFile, pauseTorrent, resumeTorrent, removeTorrent } from '../api/torrents';
 import { TorrentCard } from '../components/TorrentCard';
 import { AddTorrentModal } from '../components/AddTorrentModal';
-
 import { useTorrentWebSocket } from '../hooks/useWebSocket';
+
+const formatSpeed = (bytes: number) => {
+  if (!+bytes) return '0 B/s';
+  const k = 1024;
+  const sizes = ['B/s', 'KB/s', 'MB/s', 'GB/s'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+};
 
 export const Dashboard: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const queryClient = useQueryClient();
 
-  useTorrentWebSocket(); // Start listening to real-time updates
+  useTorrentWebSocket();
 
   const { data: torrents, isLoading } = useQuery({
     queryKey: ['torrents'],
     queryFn: getTorrents,
+    refetchInterval: 2000,
   });
 
   const addMagnetMutation = useMutation({
@@ -43,31 +51,47 @@ export const Dashboard: React.FC = () => {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['torrents'] }),
   });
 
-  const activeTorrents = torrents?.filter(t => t.progress < 100) || [];
-  const completedTorrents = torrents?.filter(t => t.progress >= 100) || [];
+  const activeTorrents = torrents?.filter(t => t.progress < 100 && t.status !== 'finished' && t.status !== 'seeding') || [];
+  const completedTorrents = torrents?.filter(t => t.progress >= 100 || t.status === 'finished' || t.status === 'seeding') || [];
+
+  const totalDownloadSpeed = torrents?.reduce((acc, t) => acc + (t.download_speed || 0), 0) || 0;
+  const totalUploadSpeed = torrents?.reduce((acc, t) => acc + (t.upload_speed || 0), 0) || 0;
 
   return (
     <div className="max-w-6xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+      {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-text flex items-center gap-3">
-            <Server className="text-primary" size={32} />
-            Dashboard
+          <h1 className="text-2xl font-bold text-text flex items-center gap-2.5">
+            <Server className="text-primary" size={24} />
+            Downloads
           </h1>
-          <p className="text-text-muted mt-1">Manage your personal torrent downloads</p>
+          <div className="flex items-center gap-3 mt-1.5 text-xs text-text-muted">
+            <span className="flex items-center gap-1 text-emerald-400 font-medium">
+              <ArrowDown size={13} /> {formatSpeed(totalDownloadSpeed)}
+            </span>
+            <span className="flex items-center gap-1 text-primary-light font-medium">
+              <ArrowUp size={13} /> {formatSpeed(totalUploadSpeed)}
+            </span>
+            <span className="text-border">•</span>
+            <span>{activeTorrents.length} active</span>
+            <span className="text-border">•</span>
+            <span>{completedTorrents.length} completed</span>
+          </div>
         </div>
         
-        <button onClick={() => setIsModalOpen(true)} className="btn btn-primary gap-2">
-          <Plus size={20} />
+        <button onClick={() => setIsModalOpen(true)} className="btn btn-primary gap-2 text-sm shadow-md shadow-primary/20">
+          <Plus size={18} />
           Add Torrent
         </button>
       </div>
 
       <div className="space-y-8">
+        {/* Active Section */}
         <section>
-          <h2 className="text-xl font-semibold mb-4 text-text-muted flex items-center gap-2">
-            Active Downloads
-            <span className="bg-surface px-2 py-0.5 rounded-full text-sm">{activeTorrents.length}</span>
+          <h2 className="text-lg font-semibold mb-3 text-text-muted flex items-center gap-2">
+            Active
+            <span className="bg-surface px-2 py-0.5 rounded-full text-xs font-medium">{activeTorrents.length}</span>
           </h2>
           
           {isLoading ? (
@@ -75,14 +99,15 @@ export const Dashboard: React.FC = () => {
               Loading torrents...
             </div>
           ) : activeTorrents.length === 0 ? (
-            <div className="glass-panel p-12 text-center border-dashed border-2 border-border">
-              <p className="text-text-muted mb-4">No active downloads.</p>
-              <button onClick={() => setIsModalOpen(true)} className="btn btn-secondary text-sm">
+            <div className="glass-panel p-10 text-center border-dashed border-2 border-border/80">
+              <DownloadCloud size={36} className="mx-auto text-text-muted/40 mb-2" />
+              <p className="text-text-muted mb-3 text-sm">No active downloads.</p>
+              <button onClick={() => setIsModalOpen(true)} className="btn btn-secondary text-xs">
                 Add your first torrent
               </button>
             </div>
           ) : (
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3">
               {activeTorrents.map((torrent) => (
                 <TorrentCard 
                   key={torrent.id} 
@@ -96,13 +121,14 @@ export const Dashboard: React.FC = () => {
           )}
         </section>
 
+        {/* Completed Section */}
         {completedTorrents.length > 0 && (
           <section>
-            <h2 className="text-xl font-semibold mb-4 text-text-muted flex items-center gap-2">
+            <h2 className="text-lg font-semibold mb-3 text-text-muted flex items-center gap-2">
               Completed
-              <span className="bg-surface px-2 py-0.5 rounded-full text-sm">{completedTorrents.length}</span>
+              <span className="bg-surface px-2 py-0.5 rounded-full text-xs font-medium">{completedTorrents.length}</span>
             </h2>
-            <div className="flex flex-col gap-4 opacity-80">
+            <div className="flex flex-col gap-3">
               {completedTorrents.map((torrent) => (
                 <TorrentCard 
                   key={torrent.id} 

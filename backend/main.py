@@ -8,7 +8,6 @@ from backend.database.session import Base, engine
 from backend.api.routes import torrents, ws, auth, settings as app_settings
 from backend.torrent.engine import torrent_engine
 from backend.database.session import SessionLocal
-from backend.api.dependencies import get_current_user
 
 # Initialize Database tables
 Base.metadata.create_all(bind=engine)
@@ -18,7 +17,6 @@ async def lifespan(app: FastAPI):
     # Startup
     db = SessionLocal()
     try:
-        auth.init_default_user(db)
         from backend.services.torrent_service import torrent_service
         torrent_service.restore_torrents(db)
     finally:
@@ -42,8 +40,8 @@ app.add_middleware(
 )
 
 app.include_router(auth.router, prefix=settings.API_V1_STR)
-app.include_router(app_settings.router, prefix=settings.API_V1_STR, dependencies=[Depends(get_current_user)])
-app.include_router(torrents.router, prefix=settings.API_V1_STR, dependencies=[Depends(get_current_user)])
+app.include_router(app_settings.router, prefix=settings.API_V1_STR)
+app.include_router(torrents.router, prefix=settings.API_V1_STR)
 app.include_router(ws.router, prefix=settings.API_V1_STR)
 
 # Serve the compiled React frontend natively

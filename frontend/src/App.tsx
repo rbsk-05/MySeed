@@ -1,11 +1,9 @@
 
 import { useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { LogOut, Settings as SettingsIcon, LayoutDashboard } from 'lucide-react';
+import { Settings as SettingsIcon, LayoutDashboard } from 'lucide-react';
 import { Dashboard } from './pages/Dashboard';
-import { Login } from './pages/Login';
 import { SettingsPage } from './pages/Settings';
-import { useAuthStore } from './store/authStore';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -17,13 +15,7 @@ const queryClient = new QueryClient({
 });
 
 function App() {
-  const token = useAuthStore((state) => state.token);
-  const logout = useAuthStore((state) => state.logout);
   const [currentView, setCurrentView] = useState<'dashboard' | 'settings'>('dashboard');
-
-  if (!token) {
-    return <Login />;
-  }
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -43,21 +35,19 @@ function App() {
             <div className="flex items-center gap-2">
               <button 
                 onClick={() => setCurrentView('dashboard')} 
-                className={`p-2 rounded-lg transition-colors ${currentView === 'dashboard' ? 'text-primary bg-primary/10' : 'text-text-muted hover:text-text hover:bg-surface-hover'}`}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${currentView === 'dashboard' ? 'text-primary bg-primary/10' : 'text-text-muted hover:text-text hover:bg-surface-hover'}`}
                 title="Dashboard"
               >
-                <LayoutDashboard size={20} />
+                <LayoutDashboard size={18} />
+                <span>Dashboard</span>
               </button>
               <button 
                 onClick={() => setCurrentView('settings')} 
-                className={`p-2 rounded-lg transition-colors ${currentView === 'settings' ? 'text-primary bg-primary/10' : 'text-text-muted hover:text-text hover:bg-surface-hover'}`}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${currentView === 'settings' ? 'text-primary bg-primary/10' : 'text-text-muted hover:text-text hover:bg-surface-hover'}`}
                 title="Settings"
               >
-                <SettingsIcon size={20} />
-              </button>
-              <div className="w-px h-6 bg-border mx-2"></div>
-              <button onClick={logout} className="p-2 text-text-muted hover:text-danger rounded-lg transition-colors hover:bg-surface-hover" title="Logout">
-                <LogOut size={20} />
+                <SettingsIcon size={18} />
+                <span>Settings</span>
               </button>
             </div>
           </div>

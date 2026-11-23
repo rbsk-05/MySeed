@@ -91,27 +91,50 @@ class TorrentEngine:
         if not handle:
             return None
         
-        status = handle.status()
-        state_str = ['queued', 'checking', 'downloading metadata',
-                     'downloading', 'finished', 'seeding', 'allocating',
-                     'checking fastresume'][status.state]
-                     
-        if handle.is_paused() and status.state != lt.torrent_status.finished:
-            state_str = 'paused'
+        try:
+            status = handle.status()
+            state_str = ['queued', 'checking', 'downloading metadata',
+                         'downloading', 'finished', 'seeding', 'allocating',
+                         'checking fastresume'][status.state]
+                         
+            if handle.is_paused() and status.state != lt.torrent_status.finished:
+                state_str = 'paused'
+                
+            total_wanted = status.total_wanted
+            total_done = status.total_wanted_done
+            dl_rate = status.download_rate
             
-        return {
-            "name": status.name,
-            "progress": status.progress * 100,
-            "download_speed": status.download_rate,
-            "upload_speed": status.upload_rate,
-            "eta": 0 if status.download_rate == 0 else int((status.total_wanted - status.total_wanted_done) / status.download_rate),
-            "peers": status.num_peers,
-            "seeds": status.num_seeds,
-            "downloaded": status.total_done,
-            "uploaded": status.total_payload_upload,
-            "state": state_str,
-            "size": status.total_wanted,
-            "error": status.errc.message() if status.errc else ""
-        }
+            eta = 0
+            if dl_rate > 0 and total_wanted > total_done:
+                eta = int((total_wanted - total_done) / dl_rate)
+
+            # Error message if any (only when errc.value != 0, ignoring success code 0)
+            err_msg = ""
+            if hasattr(status, 'errc') and status.errc:
+                try:
+                    err_val = status.errc.value() if hasattr(status.errc, 'value') else 0
+                    if err_val != 0:
+                        raw_msg = status.errc.message() if hasattr(status.errc, 'message') else str(status.errc)
+                        if raw_msg and "completed successfully" not in raw_msg.lower():
+                            err_msg = raw_msg
+                except Exception:
+                    pass
+
+            return {
+                "name": status.name,
+                "progress": round(status.progress * 100, 2),
+                "download_speed": dl_rate,
+                "upload_speed": status.upload_rate,
+                "eta": eta,
+                "peers": status.num_peers,
+                "seeds": status.num_seeds,
+                "downloaded": status.total_done,
+                "uploaded": status.total_payload_upload,
+                "state": state_str,
+                "size": total_wanted,
+                "error": err_msg
+            }
+        except Exception:
+            return None
 
 torrent_engine = TorrentEngine()

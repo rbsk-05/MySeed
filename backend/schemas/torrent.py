@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Union
 from datetime import datetime
 
 class TorrentBase(BaseModel):
@@ -14,13 +14,17 @@ class TorrentCreate(TorrentBase):
     pass
 
 class TorrentUpdate(BaseModel):
+    name: Optional[str] = None
+    size: Optional[int] = None
     status: Optional[str] = None
     is_paused: Optional[bool] = None
 
 class TorrentResponse(TorrentBase):
     id: int
-    added_date: datetime
+    added_date: Union[datetime, str]
     status: str
+    state: Optional[str] = None
+    error: Optional[str] = None
     
     # Live stats (populated from libtorrent, not DB)
     progress: float = 0.0

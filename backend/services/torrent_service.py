@@ -87,30 +87,54 @@ class TorrentService:
         for db_t in db_torrents:
             stats = torrent_engine.get_status(db_t.info_hash)
             
+            added_date_str = db_t.added_date.isoformat() if db_t.added_date else None
+
             # Merge DB info with Live stats
             t_dict = {
                 "id": db_t.id,
                 "info_hash": db_t.info_hash,
                 "name": db_t.name,
+                "size": db_t.size or 0,
                 "save_path": db_t.save_path,
-                "added_date": db_t.added_date,
+                "added_date": added_date_str,
                 "is_paused": db_t.is_paused,
+                "progress": 0.0,
+                "download_speed": 0,
+                "upload_speed": 0,
+                "eta": 0,
+                "peers": 0,
+                "seeds": 0,
+                "downloaded": 0,
+                "uploaded": 0,
+                "state": "paused" if db_t.is_paused else db_t.status,
+                "status": "paused" if db_t.is_paused else db_t.status,
             }
             
             if stats:
                 t_dict.update(stats)
                 if "state" in stats:
                     t_dict["status"] = stats["state"]
+
+                # Ensure name is not overwritten by empty string
+                if not stats.get("name"):
+                    t_dict["name"] = db_t.name
+                    
                 # Persist finished/seeding state to DB
                 if stats.get("state") in ["finished", "seeding"] and db_t.status != stats.get("state"):
                     torrent_repo.update(db, db_t, TorrentUpdate(status=stats["state"]))
                 
-                # update name/size in DB if we now have metadata and didn't before
-                if db_t.name == "Downloading Metadata..." and stats.get("name"):
-                    torrent_repo.update(db, db_t, TorrentUpdate(name=stats["name"], size=stats["size"]))
+                # Update name/size in DB once metadata arrives
+                if stats.get("name") and (db_t.name in ["Downloading Metadata...", "Unknown", ""] or not db_t.size):
+                    update_kwargs = {}
+                    if db_t.name in ["Downloading Metadata...", "Unknown", ""] and stats.get("name"):
+                        update_kwargs["name"] = stats["name"]
+                    if (not db_t.size or db_t.size == 0) and stats.get("size", 0) > 0:
+                        update_kwargs["size"] = stats["size"]
+                    if update_kwargs:
+                        torrent_repo.update(db, db_t, TorrentUpdate(**update_kwargs))
             else:
-                t_dict["status"] = db_t.status
-                t_dict["progress"] = 100 if db_t.status in ["finished", "seeding"] else 0
+                t_dict["status"] = "paused" if db_t.is_paused else db_t.status
+                t_dict["progress"] = 100.0 if db_t.status in ["finished", "seeding"] else 0.0
                 
             results.append(t_dict)
         return results
