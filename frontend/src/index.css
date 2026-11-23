@@ -1,218 +1,156 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
+
 @import "tailwindcss";
 
 @theme {
-  --color-win-gray: #c0c0c0;
-  --color-win-dark: #808080;
-  --color-win-black: #000000;
-  --color-win-white: #ffffff;
-  --color-win-navy: #000080;
-  --color-win-teal: #008080;
-  --color-win-cyan: #1084d0;
-  --color-win-green: #008000;
-  --color-win-red: #cc0000;
-  --color-win-yellow: #ffff00;
+  --color-beige-bg: #f7f4ed;
+  --color-beige-card: #fffdf9;
+  --color-beige-surface: #f0ebe1;
+  --color-beige-hover: #e8e1d5;
+  --color-beige-border: #e2d9cb;
+  --color-beige-dark: #292524;
+  --color-beige-muted: #78716c;
+  --color-chill-orange: #ea580c;
+  --color-chill-coral: #f97316;
+  --color-chill-yellow: #eab308;
+  --color-chill-green: #16a34a;
+  --color-chill-blue: #0284c7;
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
 }
 
 body {
-  background-color: #008080;
-  font-family: 'MS Sans Serif', Tahoma, 'Segoe UI', Arial, sans-serif;
-  color: #000000;
+  background-color: #f7f4ed;
+  color: #292524;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   margin: 0;
   padding: 0;
   min-height: 100vh;
-  -webkit-font-smoothing: auto;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* 90s Bevel Utilities */
-.win-outset {
-  background-color: #c0c0c0;
-  border-top: 2px solid #ffffff;
-  border-left: 2px solid #ffffff;
-  border-right: 2px solid #404040;
-  border-bottom: 2px solid #404040;
-  box-shadow: 1px 1px 0px 0px #000000;
+/* 35mm Celluloid Filmstrip Animations */
+@keyframes filmstripRoll {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: -16px 0;
+  }
 }
 
-.win-inset {
-  background-color: #ffffff;
-  border-top: 2px solid #808080;
-  border-left: 2px solid #808080;
-  border-right: 2px solid #ffffff;
-  border-bottom: 2px solid #ffffff;
-  box-shadow: inset 1px 1px 0px 0px #000000;
+.filmstrip-track {
+  background-color: #18181b;
+  border: 1.5px solid #27272a;
+  position: relative;
+  overflow: visible;
 }
 
-.win-status-inset {
-  background-color: #c0c0c0;
-  border-top: 1px solid #808080;
-  border-left: 1px solid #808080;
-  border-right: 1px solid #ffffff;
-  border-bottom: 1px solid #ffffff;
+/* 35mm Filmstrip Sprocket Holes along the top and bottom */
+.filmstrip-sprockets {
+  background-image: repeating-linear-gradient(
+    90deg,
+    #ffffff 0px,
+    #ffffff 3px,
+    transparent 3px,
+    transparent 8px
+  );
+  opacity: 0.85;
 }
 
-/* 90s Window Chrome */
-.win-window {
-  background-color: #c0c0c0;
-  border-top: 2px solid #ffffff;
-  border-left: 2px solid #ffffff;
-  border-right: 2px solid #404040;
-  border-bottom: 2px solid #404040;
-  box-shadow: 2px 2px 0px 0px #000000;
+.filmstrip-sprockets-active {
+  animation: filmstripRoll 0.5s linear infinite;
 }
 
-.win-titlebar {
-  background: linear-gradient(90deg, #000080 0%, #1084d0 100%);
-  color: #ffffff;
-  font-weight: bold;
+@keyframes projectorLightFlicker {
+  0%, 100% {
+    opacity: 0.85;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.05);
+  }
+}
+
+.projector-slide-rolling {
+  animation: projectorLightFlicker 1.2s ease-in-out infinite;
+}
+
+/* Chill Tactile Buttons */
+.chill-btn {
+  background-color: #fffdf9;
+  border: 1.5px solid #e2d9cb;
+  box-shadow: 0 2px 0 0 #d6cbb9;
+  color: #292524;
+  font-weight: 600;
   font-size: 13px;
-  padding: 3px 4px 3px 6px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  line-height: 1.2;
-}
-
-.win-btn {
-  background-color: #c0c0c0;
-  border-top: 2px solid #ffffff;
-  border-left: 2px solid #ffffff;
-  border-right: 2px solid #404040;
-  border-bottom: 2px solid #404040;
-  box-shadow: 1px 1px 0px 0px #000000;
-  color: #000000;
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: normal;
-  padding: 3px 10px;
-  cursor: pointer;
+  padding: 6px 14px;
+  border-radius: 9999px;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 4px;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
   user-select: none;
 }
 
-.win-btn:active {
-  border-top: 2px solid #404040;
-  border-left: 2px solid #404040;
-  border-right: 2px solid #ffffff;
-  border-bottom: 2px solid #ffffff;
-  box-shadow: none;
-  transform: translate(1px, 1px);
+.chill-btn:hover {
+  background-color: #f0ebe1;
+  border-color: #d6cbb9;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 0 0 #c9bca6;
 }
 
-.win-btn-default {
-  font-weight: bold;
-  outline: 1px solid #000000;
+.chill-btn:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 0 #c9bca6;
 }
 
-.win-btn-title {
-  width: 16px;
-  height: 14px;
-  background-color: #c0c0c0;
-  border-top: 1px solid #ffffff;
-  border-left: 1px solid #ffffff;
-  border-right: 1px solid #404040;
-  border-bottom: 1px solid #404040;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 10px;
-  font-weight: bold;
-  color: #000000;
-  cursor: pointer;
-  line-height: 1;
+.chill-btn-primary {
+  background-color: #ea580c;
+  border-color: #c2410c;
+  box-shadow: 0 2px 0 0 #9a3412;
+  color: #ffffff;
 }
 
-.win-btn-title:active {
-  border-top: 1px solid #404040;
-  border-left: 1px solid #404040;
-  border-right: 1px solid #ffffff;
-  border-bottom: 1px solid #ffffff;
+.chill-btn-primary:hover {
+  background-color: #f97316;
+  border-color: #ea580c;
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 0 0 #9a3412;
 }
 
-/* 90s Segmented Progress Bar */
-.win-progress-track {
-  background-color: #ffffff;
-  border-top: 1px solid #808080;
-  border-left: 1px solid #808080;
-  border-right: 1px solid #ffffff;
-  border-bottom: 1px solid #ffffff;
-  height: 16px;
-  position: relative;
-  overflow: hidden;
+.chill-btn-primary:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 0 #9a3412;
 }
 
-.win-progress-bar {
-  height: 100%;
-  background: repeating-linear-gradient(
-    90deg,
-    #000080 0px,
-    #000080 8px,
-    #ffffff 8px,
-    #ffffff 10px
-  );
+/* Warm Card Containers */
+.chill-card {
+  background-color: #fffdf9;
+  border: 1.5px solid #e9e2d5;
+  box-shadow: 0 4px 12px -2px rgba(41, 37, 36, 0.05);
+  border-radius: 1.25rem;
 }
 
-.win-progress-bar-done {
-  height: 100%;
-  background: repeating-linear-gradient(
-    90deg,
-    #008000 0px,
-    #008000 8px,
-    #ffffff 8px,
-    #ffffff 10px
-  );
-}
-
-.win-progress-bar-paused {
-  height: 100%;
-  background: repeating-linear-gradient(
-    90deg,
-    #808080 0px,
-    #808080 8px,
-    #ffffff 8px,
-    #ffffff 10px
-  );
-}
-
-/* Fieldset / Groupbox */
-.win-fieldset {
-  border: 2px groove #ffffff;
-  padding: 8px 12px;
-  margin-top: 6px;
-  position: relative;
-}
-
-.win-fieldset legend {
-  padding: 0 4px;
-  font-size: 11px;
-  font-weight: bold;
-  color: #000000;
-}
-
-/* Custom 90s scrollbars */
+/* Custom Chill Scrollbars */
 ::-webkit-scrollbar {
-  width: 16px;
-  height: 16px;
+  width: 10px;
+  height: 10px;
 }
 
 ::-webkit-scrollbar-track {
-  background-color: #c0c0c0;
+  background: #f7f4ed;
 }
 
 ::-webkit-scrollbar-thumb {
-  background-color: #c0c0c0;
-  border-top: 2px solid #ffffff;
-  border-left: 2px solid #ffffff;
-  border-right: 2px solid #404040;
-  border-bottom: 2px solid #404040;
+  background: #d6cbb9;
+  border-radius: 9999px;
+  border: 2px solid #f7f4ed;
 }
 
-::-webkit-scrollbar-thumb:active {
-  background-color: #b0b0b0;
-  border-top: 2px solid #404040;
-  border-left: 2px solid #404040;
-  border-right: 2px solid #ffffff;
-  border-bottom: 2px solid #ffffff;
+::-webkit-scrollbar-thumb:hover {
+  background: #b8aa93;
 }

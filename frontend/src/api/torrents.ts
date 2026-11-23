@@ -9,22 +9,16 @@ export const getTorrents = async (): Promise<Torrent[]> => {
 export const addMagnet = async (magnetUri: string): Promise<Torrent> => {
   const formData = new FormData();
   formData.append('magnet_uri', magnetUri);
-  const { data } = await apiClient.post('/torrents/magnet', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  });
+  // Do not manually set 'Content-Type': 'multipart/form-data'; Axios & browser set it with boundary
+  const { data } = await apiClient.post('/torrents/magnet', formData);
   return data;
 };
 
 export const uploadFile = async (file: File): Promise<Torrent> => {
   const formData = new FormData();
   formData.append('file', file);
-  const { data } = await apiClient.post('/torrents/upload', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  });
+  // Do not manually set 'Content-Type': 'multipart/form-data'; Axios & browser set it with boundary
+  const { data } = await apiClient.post('/torrents/upload', formData);
   return data;
 };
 

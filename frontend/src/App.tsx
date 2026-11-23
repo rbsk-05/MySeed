@@ -1,8 +1,8 @@
-
-import { useState, useEffect } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useState, useEffect, useRef } from 'react';
+import { QueryClient, QueryClientProvider, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Dashboard } from './pages/Dashboard';
 import { SettingsPage } from './pages/Settings';
+import { uploadFile, addMagnet } from './api/torrents';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -13,228 +13,207 @@ const queryClient = new QueryClient({
   },
 });
 
-function App() {
+function AppContent() {
   const [currentView, setCurrentView] = useState<'dashboard' | 'settings'>('dashboard');
-  const [isMaximized, setIsMaximized] = useState(false);
-  const [isMinimized, setIsMinimized] = useState(false);
-  const [startMenuOpen, setStartMenuOpen] = useState(false);
-  const [currentTime, setCurrentTime] = useState(() => 
-    new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-  );
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const [toast, setToast] = useState<{ message: string; isError?: boolean } | null>(null);
+  const dragCounter = useRef(0);
+  const toastTimeoutRef = useRef<any>(null);
+  const query = useQueryClient();
 
+  const showToast = (message: string, isError = false) => {
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+    }
+    setToast({ message, isError });
+    toastTimeoutRef.current = setTimeout(() => setToast(null), 4000);
+  };
+
+  const uploadFileMutation = useMutation({
+    mutationFn: uploadFile,
+    onSuccess: (data) => {
+      query.invalidateQueries({ queryKey: ['torrents'] });
+      setCurrentView('dashboard');
+      showToast(`Added torrent: ${data.name || 'File'}`);
+    },
+    onError: (err: any) => {
+      const msg = err?.response?.data?.detail || err?.message || 'Failed to add torrent';
+      showToast(`Error: ${msg}`, true);
+    },
+  });
+
+  const addMagnetMutation = useMutation({
+    mutationFn: addMagnet,
+    onSuccess: (data) => {
+      query.invalidateQueries({ queryKey: ['torrents'] });
+      setCurrentView('dashboard');
+      showToast(`Added magnet: ${data.name || 'Torrent'}`);
+    },
+    onError: (err: any) => {
+      const msg = err?.response?.data?.detail || err?.message || 'Failed to add magnet link';
+      showToast(`Error: ${msg}`, true);
+    },
+  });
+
+  const uploadMutateRef = useRef(uploadFileMutation.mutate);
+  uploadMutateRef.current = uploadFileMutation.mutate;
+
+  const magnetMutateRef = useRef(addMagnetMutation.mutate);
+  magnetMutateRef.current = addMagnetMutation.mutate;
+
+  // Screen-wide drag and drop listener (drops file anywhere to immediately register)
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-    }, 1000);
-    return () => clearInterval(timer);
+    const handleDragEnter = (e: DragEvent) => {
+      e.preventDefault();
+      dragCounter.current++;
+      setIsDraggingOver(true);
+    };
+
+    const handleDragOver = (e: DragEvent) => {
+      e.preventDefault();
+      if (e.dataTransfer) {
+        e.dataTransfer.dropEffect = 'copy';
+      }
+    };
+
+    const handleDragLeave = (e: DragEvent) => {
+      e.preventDefault();
+      dragCounter.current--;
+      if (dragCounter.current <= 0) {
+        dragCounter.current = 0;
+        setIsDraggingOver(false);
+      }
+    };
+
+    const handleDrop = (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dragCounter.current = 0;
+      setIsDraggingOver(false);
+
+      const files = e.dataTransfer?.files;
+      if (files && files.length > 0) {
+        for (let i = 0; i < files.length; i++) {
+          uploadMutateRef.current(files[i]);
+        }
+        setCurrentView('dashboard');
+        return;
+      }
+
+      const text = e.dataTransfer?.getData('text');
+      if (text && text.trim().startsWith('magnet:?')) {
+        magnetMutateRef.current(text.trim());
+        setCurrentView('dashboard');
+      }
+    };
+
+    // Attach to both window and document to guarantee browser interception
+    window.addEventListener('dragenter', handleDragEnter);
+    window.addEventListener('dragover', handleDragOver);
+    window.addEventListener('dragleave', handleDragLeave);
+    window.addEventListener('drop', handleDrop);
+
+    document.addEventListener('dragover', handleDragOver);
+    document.addEventListener('drop', handleDrop);
+
+    return () => {
+      window.removeEventListener('dragenter', handleDragEnter);
+      window.removeEventListener('dragover', handleDragOver);
+      window.removeEventListener('dragleave', handleDragLeave);
+      window.removeEventListener('drop', handleDrop);
+      document.removeEventListener('dragover', handleDragOver);
+      document.removeEventListener('drop', handleDrop);
+    };
   }, []);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      {/* 90s Desktop Canvas */}
-      <div 
-        className="w-full h-screen overflow-hidden flex flex-col justify-between select-none relative"
-        style={{ backgroundColor: '#008080' }}
-        onClick={() => { if (startMenuOpen) setStartMenuOpen(false); }}
-      >
-        {/* Desktop Icons on Top-Left */}
-        <div className="absolute top-4 left-4 flex flex-col gap-5 z-0">
-          <div 
-            className="flex flex-col items-center gap-1 w-20 cursor-pointer group"
-            onDoubleClick={() => { setIsMinimized(false); setCurrentView('dashboard'); }}
-          >
-            <div className="w-10 h-10 flex items-center justify-center text-2xl drop-shadow">
-              💾
+    <div className="min-h-screen bg-[#f7f4ed] text-[#292524] flex flex-col font-sans selection:bg-[#fed7aa] selection:text-[#c2410c] relative">
+      {/* Toast Notification Alert */}
+      {toast && (
+        <div className="fixed top-5 right-5 z-50 animate-in slide-in-from-top-2 duration-150">
+          <div className={`chill-card px-4 py-2.5 shadow-xl border text-xs font-bold flex items-center gap-2 ${
+            toast.isError 
+              ? 'bg-[#fee2e2] text-[#b91c1c] border-[#fca5a5]' 
+              : 'bg-[#dcfce7] text-[#15803d] border-[#86efac]'
+          }`}>
+            <span>{toast.isError ? '⚠️' : '✓'}</span>
+            <span>{toast.message}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Screen-Wide Drag and Drop Dropzone Overlay */}
+      {isDraggingOver && (
+        <div className="fixed inset-0 z-50 bg-[#292524]/50 backdrop-blur-xs flex items-center justify-center p-4 pointer-events-none select-none">
+          <div className="chill-card bg-[#fffdf9] border-2 border-dashed border-[#ea580c] p-8 max-w-sm w-full text-center shadow-2xl animate-in zoom-in-95 duration-150">
+            <div className="w-12 h-12 rounded-2xl bg-[#ffedd5] text-[#ea580c] border border-[#fed7aa] flex items-center justify-center text-xl mx-auto mb-3 font-mono font-bold">
+              ↓
             </div>
-            <span className="text-[11px] text-white text-center px-1 font-mono tracking-tight group-hover:bg-[#000080] group-hover:outline-dotted group-hover:outline-1">
-              Torrent Client
+            <h3 className="text-base font-bold text-[#292524] mb-1">
+              Drop file to download
+            </h3>
+            <p className="text-xs text-[#78716c]">
+              Release anywhere on screen to automatically register the torrent
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Header */}
+      <header className="bg-[#fffdf9] border-b border-[#e9e2d5] sticky top-0 z-40 shadow-xs">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+          {/* Logo */}
+          <div 
+            className="cursor-pointer"
+            onClick={() => setCurrentView('dashboard')}
+          >
+            <span className="font-extrabold text-xl text-[#292524] tracking-tight">
+              Ciné<span className="text-[#ea580c]">Torrent</span>
             </span>
           </div>
 
-          <div 
-            className="flex flex-col items-center gap-1 w-20 cursor-pointer group"
-            onDoubleClick={() => { setIsMinimized(false); setCurrentView('settings'); }}
-          >
-            <div className="w-10 h-10 flex items-center justify-center text-2xl drop-shadow">
-              ⚙️
-            </div>
-            <span className="text-[11px] text-white text-center px-1 font-mono tracking-tight group-hover:bg-[#000080] group-hover:outline-dotted group-hover:outline-1">
+          {/* Navigation Buttons */}
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => setCurrentView('dashboard')}
+              className={`chill-btn text-xs font-bold ${
+                currentView === 'dashboard'
+                  ? 'bg-[#292524] text-white border-[#292524] hover:bg-[#1c1917]'
+                  : 'text-[#78716c] hover:text-[#292524]'
+              }`}
+            >
+              Torrents
+            </button>
+            <button 
+              onClick={() => setCurrentView('settings')}
+              className={`chill-btn text-xs font-bold ${
+                currentView === 'settings'
+                  ? 'bg-[#292524] text-white border-[#292524] hover:bg-[#1c1917]'
+                  : 'text-[#78716c] hover:text-[#292524]'
+              }`}
+            >
               Settings
-            </span>
-          </div>
-
-          <div className="flex flex-col items-center gap-1 w-20 cursor-pointer group">
-            <div className="w-10 h-10 flex items-center justify-center text-2xl drop-shadow">
-              🗑️
-            </div>
-            <span className="text-[11px] text-white text-center px-1 font-mono tracking-tight group-hover:bg-[#000080] group-hover:outline-dotted group-hover:outline-1">
-              Recycle Bin
-            </span>
+            </button>
           </div>
         </div>
+      </header>
 
-        {/* The Main Windows 95 Application Window */}
-        {!isMinimized ? (
-          <div className="flex-1 flex items-center justify-center p-2 sm:p-4 z-10 overflow-hidden">
-            <div 
-              className={`win-window flex flex-col transition-all duration-100 ${
-                isMaximized 
-                  ? 'w-full h-full' 
-                  : 'w-full max-w-5xl h-[92vh] max-h-[820px]'
-              }`}
-            >
-              {/* Window Title Bar */}
-              <div className="win-titlebar">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm">💾</span>
-                  <span className="font-bold text-xs tracking-wide">
-                    Personal Torrent Downloader v1.0 [Win95 Edition]
-                  </span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <button 
-                    onClick={() => setIsMinimized(true)}
-                    className="win-btn-title"
-                    title="Minimize"
-                  >
-                    _
-                  </button>
-                  <button 
-                    onClick={() => setIsMaximized(!isMaximized)}
-                    className="win-btn-title"
-                    title={isMaximized ? "Restore" : "Maximize"}
-                  >
-                    {isMaximized ? '❐' : '□'}
-                  </button>
-                  <button 
-                    onClick={() => setIsMinimized(true)}
-                    className="win-btn-title"
-                    title="Close"
-                  >
-                    ✕
-                  </button>
-                </div>
-              </div>
-
-              {/* Classic Win95 Menu Bar */}
-              <div className="bg-[#c0c0c0] border-b border-[#808080] px-2 py-1 flex items-center gap-4 text-xs">
-                <span 
-                  className="cursor-pointer hover:bg-[#000080] hover:text-white px-1.5 py-0.5"
-                  onClick={() => setCurrentView('dashboard')}
-                >
-                  <u>F</u>ile
-                </span>
-                <span 
-                  className={`cursor-pointer px-1.5 py-0.5 ${currentView === 'dashboard' ? 'bg-[#000080] text-white font-bold' : 'hover:bg-[#000080] hover:text-white'}`}
-                  onClick={() => setCurrentView('dashboard')}
-                >
-                  <u>T</u>ransfers
-                </span>
-                <span 
-                  className={`cursor-pointer px-1.5 py-0.5 ${currentView === 'settings' ? 'bg-[#000080] text-white font-bold' : 'hover:bg-[#000080] hover:text-white'}`}
-                  onClick={() => setCurrentView('settings')}
-                >
-                  <u>O</u>ptions
-                </span>
-                <span 
-                  className="cursor-pointer hover:bg-[#000080] hover:text-white px-1.5 py-0.5"
-                  onClick={() => alert("Personal Torrent Client 1995 Edition.\nPure local BitTorrent client.")}
-                >
-                  <u>H</u>elp
-                </span>
-              </div>
-
-              {/* Main Content Area */}
-              <div className="flex-1 bg-[#c0c0c0] p-2 overflow-auto flex flex-col min-h-0">
-                {currentView === 'dashboard' ? <Dashboard /> : <SettingsPage onBack={() => setCurrentView('dashboard')} />}
-              </div>
-            </div>
-          </div>
+      {/* Main Content Area */}
+      <main className="flex-1">
+        {currentView === 'dashboard' ? (
+          <Dashboard />
         ) : (
-          <div className="flex-1" />
+          <SettingsPage onBack={() => setCurrentView('dashboard')} />
         )}
+      </main>
+    </div>
+  );
+}
 
-        {/* Windows 95 Start Menu Popup */}
-        {startMenuOpen && (
-          <div 
-            className="win-window absolute bottom-8 left-0 w-52 z-50 flex"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Blue Side Banner */}
-            <div className="bg-[#000080] text-white w-7 flex items-end justify-center pb-3">
-              <span className="font-bold text-sm tracking-widest -rotate-90 origin-bottom-left whitespace-nowrap">
-                WIN95 TORRENT
-              </span>
-            </div>
-            {/* Menu Items */}
-            <div className="flex-1 bg-[#c0c0c0] py-1 flex flex-col text-xs">
-              <button 
-                onClick={() => { setCurrentView('dashboard'); setIsMinimized(false); setStartMenuOpen(false); }}
-                className="w-full text-left px-3 py-1.5 hover:bg-[#000080] hover:text-white flex items-center gap-2"
-              >
-                <span>💾</span>
-                <span>Transfers Manager</span>
-              </button>
-              <button 
-                onClick={() => { setCurrentView('settings'); setIsMinimized(false); setStartMenuOpen(false); }}
-                className="w-full text-left px-3 py-1.5 hover:bg-[#000080] hover:text-white flex items-center gap-2"
-              >
-                <span>⚙️</span>
-                <span>Preferences</span>
-              </button>
-              <div className="border-t border-[#808080] border-b border-white my-1" />
-              <button 
-                onClick={() => { alert("Personal Torrent Client [1995 Edition]\nPowered by FastAPI & libtorrent"); setStartMenuOpen(false); }}
-                className="w-full text-left px-3 py-1.5 hover:bg-[#000080] hover:text-white flex items-center gap-2"
-              >
-                <span>ℹ️</span>
-                <span>About...</span>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Windows 95 Bottom Taskbar */}
-        <div className="h-8 bg-[#c0c0c0] border-t-2 border-white flex items-center justify-between px-1 z-40 shrink-0">
-          <div className="flex items-center gap-1.5 h-full py-0.5">
-            {/* Start Button */}
-            <button 
-              onClick={(e) => { e.stopPropagation(); setStartMenuOpen(!startMenuOpen); }}
-              className={`h-full px-2 flex items-center gap-1 text-xs font-bold ${
-                startMenuOpen 
-                  ? 'win-btn border-t-[#404040] border-l-[#404040] border-b-white border-r-white bg-[#b0b0b0]' 
-                  : 'win-btn'
-              }`}
-            >
-              <span className="text-sm">🪟</span>
-              <span>Start</span>
-            </button>
-
-            {/* Separator */}
-            <div className="w-[2px] h-5 bg-[#808080] border-r border-white mx-0.5" />
-
-            {/* Active Window Task Tab */}
-            <button 
-              onClick={() => setIsMinimized(!isMinimized)}
-              className={`h-full px-3 flex items-center gap-1.5 text-xs text-left max-w-xs truncate ${
-                !isMinimized 
-                  ? 'win-status-inset bg-[#e0e0e0] font-bold' 
-                  : 'win-btn'
-              }`}
-            >
-              <span>💾</span>
-              <span className="truncate">Personal Torrent Downloader</span>
-            </button>
-          </div>
-
-          {/* System Tray (Notification Area) */}
-          <div className="win-status-inset h-6 flex items-center gap-2 px-2 text-xs">
-            <span title="Connected to BitTorrent Network">🖧</span>
-            <span title="Disk Storage OK">💽</span>
-            <span className="font-mono text-[11px] text-black">{currentTime}</span>
-          </div>
-        </div>
-      </div>
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AppContent />
     </QueryClientProvider>
   );
 }

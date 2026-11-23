@@ -5,14 +5,6 @@ import { TorrentCard } from '../components/TorrentCard';
 import { AddTorrentModal } from '../components/AddTorrentModal';
 import { useTorrentWebSocket } from '../hooks/useWebSocket';
 
-const formatSpeed = (bytes: number) => {
-  if (!+bytes) return '0 B/s';
-  const k = 1024;
-  const sizes = ['B/s', 'KB/s', 'MB/s', 'GB/s'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
-};
-
 export const Dashboard: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
@@ -60,129 +52,92 @@ export const Dashboard: React.FC = () => {
       ? completedTorrents 
       : (torrents || []);
 
-  const totalDownloadSpeed = torrents?.reduce((acc, t) => acc + (t.download_speed || 0), 0) || 0;
-  const totalUploadSpeed = torrents?.reduce((acc, t) => acc + (t.upload_speed || 0), 0) || 0;
-
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-[#c0c0c0]">
-      {/* 90s Client Toolbar */}
-      <div className="flex items-center justify-between pb-2 mb-1 border-b border-[#808080] flex-wrap gap-2 shrink-0">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <button 
-            onClick={() => setIsModalOpen(true)}
-            className="win-btn win-btn-default font-bold"
-          >
-            <span>➕</span>
-            <span>Add Torrent...</span>
-          </button>
-
-          <div className="w-[2px] h-5 bg-[#808080] border-r border-white mx-1" />
-
-          {/* Filter Buttons */}
-          <button 
-            onClick={() => setFilter('all')}
-            className={`text-xs px-2 py-0.5 ${filter === 'all' ? 'win-status-inset bg-[#e0e0e0] font-bold' : 'win-btn'}`}
-          >
-            All Transfers ({torrents?.length || 0})
-          </button>
-          <button 
-            onClick={() => setFilter('active')}
-            className={`text-xs px-2 py-0.5 ${filter === 'active' ? 'win-status-inset bg-[#e0e0e0] font-bold text-[#000080]' : 'win-btn'}`}
-          >
-            Downloading ({activeTorrents.length})
-          </button>
-          <button 
-            onClick={() => setFilter('completed')}
-            className={`text-xs px-2 py-0.5 ${filter === 'completed' ? 'win-status-inset bg-[#e0e0e0] font-bold text-[#008000]' : 'win-btn'}`}
-          >
-            Completed ({completedTorrents.length})
-          </button>
+    <div className="max-w-5xl mx-auto py-8 px-4 sm:px-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-[#292524] tracking-tight">
+            Ciné<span className="text-[#ea580c]">Torrent</span>
+          </h1>
         </div>
 
-        {/* Real-time speed gauges */}
-        <div className="flex items-center gap-2">
-          <div className="win-status-inset px-2 py-0.5 text-xs font-mono">
-            <span className="text-[#008000] font-bold">↓ DL:</span> {formatSpeed(totalDownloadSpeed)}
-          </div>
-          <div className="win-status-inset px-2 py-0.5 text-xs font-mono">
-            <span className="text-[#000080] font-bold">↑ UL:</span> {formatSpeed(totalUploadSpeed)}
-          </div>
-        </div>
+        <button 
+          onClick={() => setIsModalOpen(true)}
+          className="chill-btn chill-btn-primary text-xs shadow-xs"
+        >
+          + Add Torrent
+        </button>
       </div>
 
-      {/* 90s Win32 Transfer ListView Table */}
-      <div className="win-inset flex-1 overflow-auto bg-white min-h-[220px]">
-        <table className="w-full border-collapse text-left text-xs select-none">
-          <thead className="sticky top-0 bg-[#c0c0c0] z-10 shadow-sm">
-            <tr>
-              <th className="win-outset px-2 py-1 text-center font-bold text-[11px] w-8">#</th>
-              <th className="win-outset px-2 py-1 font-bold text-[11px]">Torrent Name</th>
-              <th className="win-outset px-2 py-1 font-bold text-[11px] text-right">Size</th>
-              <th className="win-outset px-2 py-1 font-bold text-[11px]">Progress</th>
-              <th className="win-outset px-2 py-1 font-bold text-[11px]">Status</th>
-              <th className="win-outset px-2 py-1 font-bold text-[11px] text-right">Down Speed</th>
-              <th className="win-outset px-2 py-1 font-bold text-[11px] text-right">Up Speed</th>
-              <th className="win-outset px-2 py-1 font-bold text-[11px] text-right">ETA</th>
-              <th className="win-outset px-2 py-1 font-bold text-[11px] text-center">Seeds/Peers</th>
-              <th className="win-outset px-2 py-1 font-bold text-[11px] text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading ? (
-              <tr>
-                <td colSpan={10} className="p-8 text-center font-mono text-xs text-[#505050]">
-                  Querying torrent engine...
-                </td>
-              </tr>
-            ) : displayedTorrents.length === 0 ? (
-              <tr>
-                <td colSpan={10} className="p-12 text-center text-[#505050]">
-                  <div className="font-mono text-sm mb-1">No torrents in current view.</div>
-                  <div className="text-xs text-[#808080] mb-3">Click "Add Torrent..." to begin downloading files via Magnet URI or .torrent file.</div>
-                  <button 
-                    onClick={() => setIsModalOpen(true)}
-                    className="win-btn"
-                  >
-                    ➕ Open Torrent File / Link
-                  </button>
-                </td>
-              </tr>
-            ) : (
-              displayedTorrents.map((torrent, idx) => (
-                <TorrentCard 
-                  key={torrent.id}
-                  torrent={torrent}
-                  index={idx + 1}
-                  onPause={(id) => pauseMutation.mutate(id)}
-                  onResume={(id) => resumeMutation.mutate(id)}
-                  onRemove={(id) => removeMutation.mutate(id)}
-                />
-              ))
-            )}
-          </tbody>
-        </table>
+      {/* Filter Tabs */}
+      <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1">
+        <button
+          onClick={() => setFilter('all')}
+          className={`text-xs font-bold px-3.5 py-1.5 rounded-full transition-all cursor-pointer ${
+            filter === 'all'
+              ? 'bg-[#292524] text-white shadow-xs'
+              : 'bg-[#fffdf9] text-[#78716c] hover:bg-[#f0ebe1] border border-[#e2d9cb]'
+          }`}
+        >
+          All Titles ({torrents?.length || 0})
+        </button>
+        <button
+          onClick={() => setFilter('active')}
+          className={`text-xs font-bold px-3.5 py-1.5 rounded-full transition-all cursor-pointer ${
+            filter === 'active'
+              ? 'bg-[#ea580c] text-white shadow-xs'
+              : 'bg-[#fffdf9] text-[#78716c] hover:bg-[#f0ebe1] border border-[#e2d9cb]'
+          }`}
+        >
+          Now Rolling ({activeTorrents.length})
+        </button>
+        <button
+          onClick={() => setFilter('completed')}
+          className={`text-xs font-bold px-3.5 py-1.5 rounded-full transition-all cursor-pointer ${
+            filter === 'completed'
+              ? 'bg-[#16a34a] text-white shadow-xs'
+              : 'bg-[#fffdf9] text-[#78716c] hover:bg-[#f0ebe1] border border-[#e2d9cb]'
+          }`}
+        >
+          Ready to Screen ({completedTorrents.length})
+        </button>
       </div>
 
-      {/* 90s Window Status Bar at Bottom */}
-      <div className="flex items-center gap-1 mt-1 pt-1 text-xs shrink-0 select-none">
-        <div className="win-status-inset px-2 py-0.5 text-[#000000] flex-1 truncate">
-          {isLoading ? 'Connecting...' : `${displayedTorrents.length} torrent(s) listed`}
-        </div>
-        <div className="win-status-inset px-2 py-0.5 font-mono whitespace-nowrap">
-          Active: <b className="text-[#000080]">{activeTorrents.length}</b>
-        </div>
-        <div className="win-status-inset px-2 py-0.5 font-mono whitespace-nowrap">
-          Done: <b className="text-[#008000]">{completedTorrents.length}</b>
-        </div>
-        <div className="win-status-inset px-2 py-0.5 font-mono whitespace-nowrap text-[#008000]">
-          D: {formatSpeed(totalDownloadSpeed)}
-        </div>
-        <div className="win-status-inset px-2 py-0.5 font-mono whitespace-nowrap text-[#000080]">
-          U: {formatSpeed(totalUploadSpeed)}
-        </div>
-        <div className="win-status-inset px-2 py-0.5 font-mono text-[11px] whitespace-nowrap">
-          DHT: Connected
-        </div>
+      {/* Main List */}
+      <div>
+        {isLoading ? (
+          <div className="chill-card p-12 text-center text-sm font-medium text-[#78716c] animate-pulse">
+            Loading torrents...
+          </div>
+        ) : displayedTorrents.length === 0 ? (
+          <div className="chill-card p-12 text-center border-dashed border-2 border-[#e2d9cb]">
+            <h3 className="text-base font-bold text-[#292524] mb-1">
+              No torrents found
+            </h3>
+            <p className="text-xs text-[#78716c] mb-4 max-w-sm mx-auto">
+              Add a magnet link or .torrent file to begin downloading.
+            </p>
+            <button 
+              onClick={() => setIsModalOpen(true)}
+              className="chill-btn chill-btn-primary text-xs"
+            >
+              + Add Torrent
+            </button>
+          </div>
+        ) : (
+          <div>
+            {displayedTorrents.map((torrent) => (
+              <TorrentCard 
+                key={torrent.id}
+                torrent={torrent}
+                onPause={(id) => pauseMutation.mutate(id)}
+                onResume={(id) => resumeMutation.mutate(id)}
+                onRemove={(id) => removeMutation.mutate(id)}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       <AddTorrentModal 

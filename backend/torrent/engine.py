@@ -82,9 +82,10 @@ class TorrentEngine:
     def remove_torrent(self, info_hash: str, delete_files: bool = False):
         handle = self.get_torrent(info_hash)
         if handle:
-            options = lt.delete_files if delete_files else 0
+            options = self.session.delete_files if delete_files else 0
             self.session.remove_torrent(handle, options)
-            del self.torrents[info_hash]
+            if info_hash in self.torrents:
+                del self.torrents[info_hash]
 
     def get_status(self, info_hash: str):
         handle = self.get_torrent(info_hash)
@@ -131,6 +132,7 @@ class TorrentEngine:
                 "downloaded": status.total_done,
                 "uploaded": status.total_payload_upload,
                 "state": state_str,
+                "is_paused": handle.is_paused(),
                 "size": total_wanted,
                 "error": err_msg
             }

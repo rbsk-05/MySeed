@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 import shutil
 import os
+import uuid
 
 from backend.database.session import get_db
 from backend.services.torrent_service import torrent_service
@@ -17,12 +18,14 @@ async def upload_torrent(
     save_path: Optional[str] = Form(None),
     db: Session = Depends(get_db)
 ):
-    if not file.filename.endswith('.torrent'):
+    filename = file.filename or "file.torrent"
+    if not filename.lower().endswith('.torrent'):
         raise HTTPException(status_code=400, detail="Must be a .torrent file")
         
     temp_dir = "./temp"
     os.makedirs(temp_dir, exist_ok=True)
-    temp_path = os.path.join(temp_dir, file.filename)
+    safe_name = f"{uuid.uuid4().hex}_{os.path.basename(filename)}"
+    temp_path = os.path.join(temp_dir, safe_name)
     
     with open(temp_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)

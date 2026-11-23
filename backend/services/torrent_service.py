@@ -1,6 +1,8 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 import os
+import shutil
+import libtorrent as lt
 
 from backend.repositories.torrent_repo import torrent_repo
 from backend.torrent.engine import torrent_engine
@@ -11,18 +13,23 @@ from typing import List
 class TorrentService:
     def add_magnet(self, db: Session, magnet_uri: str, save_path: str = None):
         try:
+            if not save_path:
+                from backend.api.routes.settings import get_or_create_settings
+                db_settings = get_or_create_settings(db)
+                save_path = db_settings.download_dir or settings.DEFAULT_DOWNLOAD_DIR
+
+            os.makedirs(save_path, exist_ok=True)
+
             handle = torrent_engine.add_magnet_link(magnet_uri, save_path)
+            handle.resume()
             info_hash = str(handle.info_hash())
             
             # Check if it already exists in DB
             existing = torrent_repo.get_by_info_hash(db, info_hash)
             if existing:
+                if existing.is_paused:
+                    torrent_repo.update(db, existing, TorrentUpdate(is_paused=False, status="downloading"))
                 return existing
-
-            if not save_path:
-                from backend.api.routes.settings import get_or_create_settings
-                db_settings = get_or_create_settings(db)
-                save_path = db_settings.download_dir
 
             torrent_in = TorrentCreate(
                 info_hash=info_hash,
@@ -37,8 +44,20 @@ class TorrentService:
 
     def add_file(self, db: Session, file_path: str, save_path: str = None):
         try:
-            import shutil
+            if not save_path:
+                from backend.api.routes.settings import get_or_create_settings
+                db_settings = get_or_create_settings(db)
+                save_path = db_settings.download_dir or settings.DEFAULT_DOWNLOAD_DIR
+                
+            os.makedirs(save_path, exist_ok=True)
+
+            # Read torrent metadata directly from file
+            info = lt.torrent_info(file_path)
+            name = info.name() or "Unknown"
+            size = info.total_size()
+
             handle = torrent_engine.add_torrent_file(file_path, save_path)
+            handle.resume()
             info_hash = str(handle.info_hash())
             
             # Save torrent file to persistent store
@@ -50,17 +69,14 @@ class TorrentService:
             
             existing = torrent_repo.get_by_info_hash(db, info_hash)
             if existing:
+                if existing.is_paused:
+                    torrent_repo.update(db, existing, TorrentUpdate(is_paused=False, status="downloading"))
                 return existing
-                
-            if not save_path:
-                from backend.api.routes.settings import get_or_create_settings
-                db_settings = get_or_create_settings(db)
-                save_path = db_settings.download_dir
-                
+
             torrent_in = TorrentCreate(
                 info_hash=info_hash,
-                name=handle.status().name or "Unknown",
-                size=handle.status().total_wanted,
+                name=name,
+                size=size,
                 save_path=save_path,
                 status="downloading",
                 is_paused=False
@@ -80,7 +96,6 @@ class TorrentService:
                     if db_t.is_paused:
                         handle.pause()
 
-
     def get_all_torrents(self, db: Session) -> List[dict]:
         db_torrents = torrent_repo.get_all(db)
         results = []
@@ -98,6 +113,7 @@ class TorrentService:
                 "save_path": db_t.save_path,
                 "added_date": added_date_str,
                 "is_paused": db_t.is_paused,
+                "status": db_t.status,
                 "progress": 0.0,
                 "download_speed": 0,
                 "upload_speed": 0,
@@ -106,62 +122,68 @@ class TorrentService:
                 "seeds": 0,
                 "downloaded": 0,
                 "uploaded": 0,
-                "state": "paused" if db_t.is_paused else db_t.status,
-                "status": "paused" if db_t.is_paused else db_t.status,
+                "state": None,
+                "error": None
             }
-            
-            if stats:
-                t_dict.update(stats)
-                if "state" in stats:
-                    t_dict["status"] = stats["state"]
 
-                # Ensure name is not overwritten by empty string
-                if not stats.get("name"):
-                    t_dict["name"] = db_t.name
-                    
-                # Persist finished/seeding state to DB
-                if stats.get("state") in ["finished", "seeding"] and db_t.status != stats.get("state"):
-                    torrent_repo.update(db, db_t, TorrentUpdate(status=stats["state"]))
-                
-                # Update name/size in DB once metadata arrives
-                if stats.get("name") and (db_t.name in ["Downloading Metadata...", "Unknown", ""] or not db_t.size):
-                    update_kwargs = {}
-                    if db_t.name in ["Downloading Metadata...", "Unknown", ""] and stats.get("name"):
-                        update_kwargs["name"] = stats["name"]
-                    if (not db_t.size or db_t.size == 0) and stats.get("size", 0) > 0:
-                        update_kwargs["size"] = stats["size"]
-                    if update_kwargs:
-                        torrent_repo.update(db, db_t, TorrentUpdate(**update_kwargs))
-            else:
-                t_dict["status"] = "paused" if db_t.is_paused else db_t.status
-                t_dict["progress"] = 100.0 if db_t.status in ["finished", "seeding"] else 0.0
-                
+            if stats:
+                is_p = stats.get("is_paused", db_t.is_paused) or stats.get("state") == "paused"
+                t_dict.update({
+                    "name": stats["name"] if stats.get("name") and stats.get("name") != "Downloading Metadata..." else db_t.name,
+                    "progress": stats.get("progress", 0.0),
+                    "download_speed": stats.get("download_speed", 0),
+                    "upload_speed": stats.get("upload_speed", 0),
+                    "eta": stats.get("eta", 0),
+                    "peers": stats.get("peers", 0),
+                    "seeds": stats.get("seeds", 0),
+                    "downloaded": stats.get("downloaded", 0),
+                    "uploaded": stats.get("uploaded", 0),
+                    "state": stats.get("state", db_t.status),
+                    "is_paused": is_p,
+                    "error": stats.get("error"),
+                    "status": "paused" if is_p else stats.get("state", db_t.status)
+                })
+                # If size wasn't set, update from engine
+                if (not db_t.size or db_t.size == 0) and stats.get("size"):
+                    db_t.size = stats["size"]
+                    t_dict["size"] = stats["size"]
+                    torrent_repo.update(db, db_t, TorrentUpdate(size=stats["size"]))
+
+                # Update name in DB if metadata arrived
+                if (db_t.name == "Downloading Metadata..." or not db_t.name) and stats["name"] and stats["name"] != "Downloading Metadata...":
+                    db_t.name = stats["name"]
+                    torrent_repo.update(db, db_t, TorrentUpdate(name=stats["name"]))
+
             results.append(t_dict)
         return results
 
     def pause_torrent(self, db: Session, torrent_id: int):
-        db_t = torrent_repo.get(db, torrent_id)
-        if not db_t:
+        torrent = torrent_repo.get(db, torrent_id)
+        if not torrent:
             raise HTTPException(status_code=404, detail="Torrent not found")
-        
-        torrent_engine.pause_torrent(db_t.info_hash)
-        return torrent_repo.update(db, db_t, TorrentUpdate(is_paused=True, status="paused"))
+        torrent_engine.pause_torrent(torrent.info_hash)
+        return torrent_repo.update(db, torrent, TorrentUpdate(is_paused=True, status="paused"))
 
     def resume_torrent(self, db: Session, torrent_id: int):
-        db_t = torrent_repo.get(db, torrent_id)
-        if not db_t:
+        torrent = torrent_repo.get(db, torrent_id)
+        if not torrent:
             raise HTTPException(status_code=404, detail="Torrent not found")
-            
-        torrent_engine.resume_torrent(db_t.info_hash)
-        return torrent_repo.update(db, db_t, TorrentUpdate(is_paused=False, status="downloading"))
+        torrent_engine.resume_torrent(torrent.info_hash)
+        return torrent_repo.update(db, torrent, TorrentUpdate(is_paused=False, status="downloading"))
 
     def remove_torrent(self, db: Session, torrent_id: int, delete_files: bool = False):
-        db_t = torrent_repo.get(db, torrent_id)
-        if not db_t:
+        torrent = torrent_repo.get(db, torrent_id)
+        if not torrent:
             raise HTTPException(status_code=404, detail="Torrent not found")
-            
-        torrent_engine.remove_torrent(db_t.info_hash, delete_files)
-        torrent_repo.delete(db, torrent_id)
-        return {"success": True}
+        torrent_engine.remove_torrent(torrent.info_hash, delete_files)
+        storage_dir = "./data/torrents"
+        persistent_torrent_path = os.path.join(storage_dir, f"{torrent.info_hash}.torrent")
+        if os.path.exists(persistent_torrent_path):
+            try:
+                os.remove(persistent_torrent_path)
+            except Exception:
+                pass
+        torrent_repo.delete(db, torrent_id=torrent_id)
+        return {"id": torrent_id, "message": "Torrent deleted successfully"}
 
 torrent_service = TorrentService()

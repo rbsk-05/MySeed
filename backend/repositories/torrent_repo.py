@@ -28,11 +28,14 @@ class TorrentRepository:
         db.refresh(db_obj)
         return db_obj
 
-    def delete(self, db: Session, torrent_id: int) -> TorrentModel:
-        obj = db.query(TorrentModel).get(torrent_id)
+    def delete(self, db: Session, torrent_id: int) -> Optional[TorrentModel]:
+        obj = db.get(TorrentModel, torrent_id)
         if obj:
             db.delete(obj)
             db.commit()
         return obj
+
+    def remove(self, db: Session, id: int) -> TorrentModel:
+        return self.delete(db, id)
 
 torrent_repo = TorrentRepository()
