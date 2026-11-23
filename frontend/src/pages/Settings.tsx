@@ -1,16 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Settings as SettingsIcon, Save } from 'lucide-react';
 import { getSettings, updateSettings } from '../api/settings';
 import type { SettingsUpdate } from '../api/settings';
 
-export const SettingsPage = () => {
+export const SettingsPage = ({ onBack }: { onBack?: () => void }) => {
   const queryClient = useQueryClient();
   const { data: currentSettings, isLoading } = useQuery({
     queryKey: ['settings'],
     queryFn: getSettings,
   });
 
+  const [activeTab, setActiveTab] = useState<'general' | 'bandwidth'>('general');
   const [formData, setFormData] = useState<SettingsUpdate>({
     download_dir: '',
     max_active_downloads: 3,
@@ -35,7 +35,7 @@ export const SettingsPage = () => {
     mutationFn: updateSettings,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['settings'] });
-      setToastMessage('Settings saved successfully!');
+      setToastMessage('Properties updated successfully.');
       setTimeout(() => setToastMessage(''), 3000);
     },
   });
@@ -53,109 +53,165 @@ export const SettingsPage = () => {
     mutation.mutate(formData);
   };
 
+  const handleOk = (e: React.FormEvent) => {
+    e.preventDefault();
+    mutation.mutate(formData, {
+      onSuccess: () => {
+        if (onBack) onBack();
+      }
+    });
+  };
+
   if (isLoading) {
-    return <div className="p-8 text-center text-text-muted animate-pulse">Loading settings...</div>;
+    return (
+      <div className="p-8 text-center font-mono text-xs text-[#505050]">
+        Loading configuration properties...
+      </div>
+    );
   }
 
   return (
-    <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8 animate-in fade-in zoom-in-95 duration-200">
-      <div className="flex items-center gap-3 mb-8">
-        <SettingsIcon className="text-primary" size={32} />
-        <h1 className="text-3xl font-bold text-text">Settings</h1>
+    <div className="flex-1 flex flex-col justify-between max-w-2xl mx-auto w-full p-2 text-xs">
+      {/* 90s Properties Sheet */}
+      <div>
+        {/* Tab Strip */}
+        <div className="flex gap-1 border-b border-[#808080] mb-3">
+          <button
+            type="button"
+            className={`px-3 py-1 text-xs border-t-2 border-l-2 border-r-2 ${
+              activeTab === 'general'
+                ? 'border-white border-r-[#404040] bg-[#c0c0c0] font-bold -mb-[1px] z-10'
+                : 'border-[#dfdfdf] border-r-[#808080] bg-[#a0a0a0] text-[#303030]'
+            }`}
+            onClick={() => setActiveTab('general')}
+          >
+            General
+          </button>
+          <button
+            type="button"
+            className={`px-3 py-1 text-xs border-t-2 border-l-2 border-r-2 ${
+              activeTab === 'bandwidth'
+                ? 'border-white border-r-[#404040] bg-[#c0c0c0] font-bold -mb-[1px] z-10'
+                : 'border-[#dfdfdf] border-r-[#808080] bg-[#a0a0a0] text-[#303030]'
+            }`}
+            onClick={() => setActiveTab('bandwidth')}
+          >
+            Bandwidth & Queue
+          </button>
+        </div>
+
+        <form id="settings-form" onSubmit={handleSubmit} className="space-y-4">
+          {activeTab === 'general' ? (
+            <fieldset className="win-fieldset">
+              <legend>Storage & Paths</legend>
+              <div className="space-y-3 py-2">
+                <div>
+                  <label className="block text-[11px] font-bold text-black mb-1">
+                    Default Download Directory:
+                  </label>
+                  <input
+                    type="text"
+                    name="download_dir"
+                    value={formData.download_dir}
+                    onChange={handleChange}
+                    className="win-inset w-full px-2 py-1 font-mono text-xs bg-white text-black outline-none"
+                    required
+                  />
+                  <p className="text-[10px] text-[#505050] mt-1">
+                    Absolute directory path on your host where finished files will be saved.
+                  </p>
+                </div>
+              </div>
+            </fieldset>
+          ) : (
+            <fieldset className="win-fieldset">
+              <legend>Queue Limits & Throttling</legend>
+              <div className="space-y-3 py-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] text-black">
+                    Maximum Active Downloads:
+                  </label>
+                  <input
+                    type="number"
+                    name="max_active_downloads"
+                    value={formData.max_active_downloads}
+                    onChange={handleChange}
+                    min="1"
+                    className="win-inset w-24 px-2 py-1 font-mono text-xs bg-white text-black text-right outline-none"
+                    required
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] text-black">
+                    Max Download Speed (KB/s, 0 = unlim):
+                  </label>
+                  <input
+                    type="number"
+                    name="max_download_speed"
+                    value={formData.max_download_speed}
+                    onChange={handleChange}
+                    min="0"
+                    className="win-inset w-24 px-2 py-1 font-mono text-xs bg-white text-black text-right outline-none"
+                    required
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] text-black">
+                    Max Upload Speed (KB/s, 0 = unlim):
+                  </label>
+                  <input
+                    type="number"
+                    name="max_upload_speed"
+                    value={formData.max_upload_speed}
+                    onChange={handleChange}
+                    min="0"
+                    className="win-inset w-24 px-2 py-1 font-mono text-xs bg-white text-black text-right outline-none"
+                    required
+                  />
+                </div>
+              </div>
+            </fieldset>
+          )}
+        </form>
       </div>
 
-      <div className="glass-panel p-8">
-        <form onSubmit={handleSubmit} className="space-y-6">
-          
-          <section>
-            <h2 className="text-lg font-semibold text-text mb-4 border-b border-border pb-2">General</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-text-muted mb-1">
-                  Default Download Directory
-                </label>
-                <input
-                  type="text"
-                  name="download_dir"
-                  value={formData.download_dir}
-                  onChange={handleChange}
-                  className="w-full bg-surface border border-border rounded-lg px-4 py-2 text-text focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  required
-                />
-                <p className="text-xs text-text-muted mt-1">Absolute path where downloaded files will be saved.</p>
-              </div>
-            </div>
-          </section>
+      {/* Footer Buttons */}
+      <div className="flex items-center justify-between pt-4 mt-4 border-t border-[#808080]">
+        <div>
+          {toastMessage && (
+            <span className="win-status-inset px-2 py-0.5 text-[#008000] font-mono text-[11px]">
+              ✓ {toastMessage}
+            </span>
+          )}
+        </div>
 
-          <section>
-            <h2 className="text-lg font-semibold text-text mb-4 border-b border-border pb-2">Queue & Limits</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-text-muted mb-1">
-                  Maximum Active Downloads
-                </label>
-                <input
-                  type="number"
-                  name="max_active_downloads"
-                  value={formData.max_active_downloads}
-                  onChange={handleChange}
-                  min="1"
-                  className="w-full bg-surface border border-border rounded-lg px-4 py-2 text-text focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-text-muted mb-1">
-                  Max Download Speed (KB/s)
-                </label>
-                <input
-                  type="number"
-                  name="max_download_speed"
-                  value={formData.max_download_speed}
-                  onChange={handleChange}
-                  min="0"
-                  className="w-full bg-surface border border-border rounded-lg px-4 py-2 text-text focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  required
-                />
-                <p className="text-xs text-text-muted mt-1">Set to 0 for unlimited.</p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-text-muted mb-1">
-                  Max Upload Speed (KB/s)
-                </label>
-                <input
-                  type="number"
-                  name="max_upload_speed"
-                  value={formData.max_upload_speed}
-                  onChange={handleChange}
-                  min="0"
-                  className="w-full bg-surface border border-border rounded-lg px-4 py-2 text-text focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  required
-                />
-                <p className="text-xs text-text-muted mt-1">Set to 0 for unlimited.</p>
-              </div>
-            </div>
-          </section>
-
-          <div className="pt-4 flex items-center justify-between">
-            {toastMessage ? (
-              <span className="text-secondary font-medium animate-in fade-in">{toastMessage}</span>
-            ) : (
-              <span></span>
-            )}
-            
-            <button 
-              type="submit" 
-              className="btn btn-primary flex items-center gap-2"
-              disabled={mutation.isPending}
-            >
-              <Save size={18} />
-              {mutation.isPending ? 'Saving...' : 'Save Settings'}
-            </button>
-          </div>
-        </form>
+        <div className="flex items-center gap-2">
+          <button 
+            type="button" 
+            onClick={handleOk}
+            className="win-btn win-btn-default min-w-[75px]"
+            disabled={mutation.isPending}
+          >
+            OK
+          </button>
+          <button 
+            type="button" 
+            onClick={() => { if (onBack) onBack(); }}
+            className="win-btn min-w-[75px]"
+          >
+            Cancel
+          </button>
+          <button 
+            type="submit" 
+            form="settings-form"
+            className="win-btn min-w-[75px]"
+            disabled={mutation.isPending}
+          >
+            {mutation.isPending ? 'Applying...' : 'Apply'}
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -1,5 +1,4 @@
 import { useState, useRef } from 'react';
-import { X, Link as LinkIcon, UploadCloud, File as FileIcon } from 'lucide-react';
 
 interface AddTorrentModalProps {
   isOpen: boolean;
@@ -35,112 +34,118 @@ export const AddTorrentModal: React.FC<AddTorrentModalProps> = ({ isOpen, onClos
     }
   };
 
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const file = e.dataTransfer.files[0];
-      if (file.name.endsWith('.torrent')) {
-        setSelectedFile(file);
-      }
-    }
-  };
-
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-  };
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-      <div className="glass-panel w-full max-w-lg p-6 relative animate-in fade-in zoom-in-95 duration-200">
-        <button 
-          onClick={onClose}
-          className="absolute top-4 right-4 p-2 text-text-muted hover:text-text bg-surface hover:bg-surface-hover rounded-full transition-colors"
-        >
-          <X size={20} />
-        </button>
-        
-        <h2 className="text-2xl font-semibold mb-6 flex items-center gap-2">
-          <UploadCloud className="text-primary" />
-          Add New Torrent
-        </h2>
-
-        <div className="flex gap-4 mb-6 border-b border-border">
-          <button
-            type="button"
-            className={`pb-2 px-2 border-b-2 transition-colors ${activeTab === 'magnet' ? 'border-primary text-primary font-medium' : 'border-transparent text-text-muted hover:text-text'}`}
-            onClick={() => setActiveTab('magnet')}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      {/* 90s Windows Dialog Box */}
+      <div className="win-window w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-100">
+        {/* Dialog Title Bar */}
+        <div className="win-titlebar">
+          <div className="flex items-center gap-1.5">
+            <span>💾</span>
+            <span>Add New Torrent</span>
+          </div>
+          <button 
+            onClick={onClose}
+            className="win-btn-title"
+            title="Cancel"
           >
-            Magnet Link
-          </button>
-          <button
-            type="button"
-            className={`pb-2 px-2 border-b-2 transition-colors ${activeTab === 'file' ? 'border-primary text-primary font-medium' : 'border-transparent text-text-muted hover:text-text'}`}
-            onClick={() => setActiveTab('file')}
-          >
-            Torrent File
+            ✕
           </button>
         </div>
-        
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {activeTab === 'magnet' ? (
-            <div>
-              <label className="block text-sm font-medium text-text-muted mb-2 flex items-center gap-2">
-                <LinkIcon size={16} /> Paste Magnet URI
-              </label>
-              <input 
-                type="text" 
-                value={magnetUri}
-                onChange={(e) => setMagnetUri(e.target.value)}
-                placeholder="magnet:?xt=urn:btih:..."
-                className="w-full bg-background border border-border rounded-lg px-4 py-3 text-text focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
-                autoFocus
-              />
-            </div>
-          ) : (
-            <div>
-              <label className="block text-sm font-medium text-text-muted mb-2 flex items-center gap-2">
-                <FileIcon size={16} /> Upload .torrent File
-              </label>
-              
-              <div 
-                className="border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:bg-surface-hover transition-colors"
-                onClick={() => fileInputRef.current?.click()}
-                onDrop={handleDrop}
-                onDragOver={handleDragOver}
-              >
-                <input 
-                  type="file" 
-                  accept=".torrent"
-                  className="hidden" 
-                  ref={fileInputRef}
-                  onChange={handleFileChange}
-                />
-                <UploadCloud className="mx-auto h-12 w-12 text-text-muted mb-4" />
-                {selectedFile ? (
-                  <p className="text-primary font-medium">{selectedFile.name}</p>
-                ) : (
-                  <p className="text-text-muted">
-                    <span className="text-primary font-medium">Click to upload</span> or drag and drop<br/>
-                    .torrent files only
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-          
-          <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={onClose} className="btn btn-secondary">
-              Cancel
-            </button>
-            <button 
-              type="submit" 
-              disabled={(activeTab === 'magnet' && !magnetUri.trim()) || (activeTab === 'file' && !selectedFile)} 
-              className="btn btn-primary"
+
+        <div className="p-3 bg-[#c0c0c0] text-xs">
+          {/* Tab Strip */}
+          <div className="flex gap-1 mb-3 border-b border-[#808080]">
+            <button
+              type="button"
+              className={`px-3 py-1 text-xs border-t-2 border-l-2 border-r-2 ${
+                activeTab === 'magnet'
+                  ? 'border-white border-r-[#404040] bg-[#c0c0c0] font-bold -mb-[1px] z-10'
+                  : 'border-[#dfdfdf] border-r-[#808080] bg-[#a0a0a0] text-[#303030]'
+              }`}
+              onClick={() => setActiveTab('magnet')}
             >
-              Start Download
+              Magnet Link
+            </button>
+            <button
+              type="button"
+              className={`px-3 py-1 text-xs border-t-2 border-l-2 border-r-2 ${
+                activeTab === 'file'
+                  ? 'border-white border-r-[#404040] bg-[#c0c0c0] font-bold -mb-[1px] z-10'
+                  : 'border-[#dfdfdf] border-r-[#808080] bg-[#a0a0a0] text-[#303030]'
+              }`}
+              onClick={() => setActiveTab('file')}
+            >
+              .Torrent File
             </button>
           </div>
-        </form>
+
+          <form onSubmit={handleSubmit} className="space-y-3">
+            {activeTab === 'magnet' ? (
+              <fieldset className="win-fieldset">
+                <legend>Magnet URI Stream</legend>
+                <p className="text-[11px] text-[#404040] mb-2">
+                  Paste the magnet link from your clipboard:
+                </p>
+                <input 
+                  type="text" 
+                  value={magnetUri}
+                  onChange={(e) => setMagnetUri(e.target.value)}
+                  placeholder="magnet:?xt=urn:btih:..."
+                  className="win-inset w-full px-2 py-1.5 font-mono text-xs text-black bg-white outline-none"
+                  autoFocus
+                />
+              </fieldset>
+            ) : (
+              <fieldset className="win-fieldset">
+                <legend>Local .Torrent File</legend>
+                <p className="text-[11px] text-[#404040] mb-2">
+                  Select a .torrent file from your local disk:
+                </p>
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="text" 
+                    readOnly
+                    value={selectedFile ? selectedFile.name : 'No file selected'}
+                    className="win-inset flex-1 px-2 py-1 font-mono text-xs text-[#505050] bg-white outline-none"
+                  />
+                  <input 
+                    type="file" 
+                    accept=".torrent"
+                    className="hidden" 
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                  />
+                  <button 
+                    type="button" 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="win-btn font-bold whitespace-nowrap"
+                  >
+                    Browse...
+                  </button>
+                </div>
+              </fieldset>
+            )}
+
+            {/* Dialog Action Buttons */}
+            <div className="flex justify-end gap-2 pt-2 border-t border-[#808080]">
+              <button 
+                type="submit" 
+                disabled={(activeTab === 'magnet' && !magnetUri.trim()) || (activeTab === 'file' && !selectedFile)}
+                className="win-btn win-btn-default min-w-[70px] disabled:opacity-50"
+              >
+                OK
+              </button>
+              <button 
+                type="button" 
+                onClick={onClose} 
+                className="win-btn min-w-[70px]"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );

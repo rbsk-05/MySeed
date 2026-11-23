@@ -1,62 +1,218 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-
 @import "tailwindcss";
 
 @theme {
-  --color-background: #0f111a;
-  --color-surface: #1e2130;
-  --color-surface-hover: #2a2e42;
-  --color-primary: #6d28d9;
-  --color-primary-hover: #5b21b6;
-  --color-primary-light: #8b5cf6;
-  --color-secondary: #10b981;
-  --color-danger: #ef4444;
-  --color-text: #f8fafc;
-  --color-text-muted: #94a3b8;
-  --color-border: #334155;
-  --font-sans: 'Inter', sans-serif;
+  --color-win-gray: #c0c0c0;
+  --color-win-dark: #808080;
+  --color-win-black: #000000;
+  --color-win-white: #ffffff;
+  --color-win-navy: #000080;
+  --color-win-teal: #008080;
+  --color-win-cyan: #1084d0;
+  --color-win-green: #008000;
+  --color-win-red: #cc0000;
+  --color-win-yellow: #ffff00;
 }
 
-@layer base {
-  body {
-    @apply bg-background text-text font-sans antialiased;
-    margin: 0;
-    min-height: 100vh;
-  }
+body {
+  background-color: #008080;
+  font-family: 'MS Sans Serif', Tahoma, 'Segoe UI', Arial, sans-serif;
+  color: #000000;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  -webkit-font-smoothing: auto;
 }
 
-@layer components {
-  .glass-panel {
-    @apply bg-surface/80 backdrop-blur-md border border-border rounded-xl shadow-xl;
-  }
-  
-  .btn {
-    @apply inline-flex items-center justify-center px-4 py-2 rounded-lg font-medium transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:pointer-events-none;
-  }
-  
-  .btn-primary {
-    @apply bg-primary text-white hover:bg-primary-hover shadow-lg shadow-primary/20 hover:shadow-primary/40;
-  }
-
-  .btn-secondary {
-    @apply bg-surface hover:bg-surface-hover border border-border text-text;
-  }
-
-  .btn-danger {
-    @apply bg-danger/10 text-danger hover:bg-danger hover:text-white border border-danger/20;
-  }
+/* 90s Bevel Utilities */
+.win-outset {
+  background-color: #c0c0c0;
+  border-top: 2px solid #ffffff;
+  border-left: 2px solid #ffffff;
+  border-right: 2px solid #404040;
+  border-bottom: 2px solid #404040;
+  box-shadow: 1px 1px 0px 0px #000000;
 }
 
-/* Custom Scrollbar */
+.win-inset {
+  background-color: #ffffff;
+  border-top: 2px solid #808080;
+  border-left: 2px solid #808080;
+  border-right: 2px solid #ffffff;
+  border-bottom: 2px solid #ffffff;
+  box-shadow: inset 1px 1px 0px 0px #000000;
+}
+
+.win-status-inset {
+  background-color: #c0c0c0;
+  border-top: 1px solid #808080;
+  border-left: 1px solid #808080;
+  border-right: 1px solid #ffffff;
+  border-bottom: 1px solid #ffffff;
+}
+
+/* 90s Window Chrome */
+.win-window {
+  background-color: #c0c0c0;
+  border-top: 2px solid #ffffff;
+  border-left: 2px solid #ffffff;
+  border-right: 2px solid #404040;
+  border-bottom: 2px solid #404040;
+  box-shadow: 2px 2px 0px 0px #000000;
+}
+
+.win-titlebar {
+  background: linear-gradient(90deg, #000080 0%, #1084d0 100%);
+  color: #ffffff;
+  font-weight: bold;
+  font-size: 13px;
+  padding: 3px 4px 3px 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  line-height: 1.2;
+}
+
+.win-btn {
+  background-color: #c0c0c0;
+  border-top: 2px solid #ffffff;
+  border-left: 2px solid #ffffff;
+  border-right: 2px solid #404040;
+  border-bottom: 2px solid #404040;
+  box-shadow: 1px 1px 0px 0px #000000;
+  color: #000000;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: normal;
+  padding: 3px 10px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  user-select: none;
+}
+
+.win-btn:active {
+  border-top: 2px solid #404040;
+  border-left: 2px solid #404040;
+  border-right: 2px solid #ffffff;
+  border-bottom: 2px solid #ffffff;
+  box-shadow: none;
+  transform: translate(1px, 1px);
+}
+
+.win-btn-default {
+  font-weight: bold;
+  outline: 1px solid #000000;
+}
+
+.win-btn-title {
+  width: 16px;
+  height: 14px;
+  background-color: #c0c0c0;
+  border-top: 1px solid #ffffff;
+  border-left: 1px solid #ffffff;
+  border-right: 1px solid #404040;
+  border-bottom: 1px solid #404040;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: bold;
+  color: #000000;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.win-btn-title:active {
+  border-top: 1px solid #404040;
+  border-left: 1px solid #404040;
+  border-right: 1px solid #ffffff;
+  border-bottom: 1px solid #ffffff;
+}
+
+/* 90s Segmented Progress Bar */
+.win-progress-track {
+  background-color: #ffffff;
+  border-top: 1px solid #808080;
+  border-left: 1px solid #808080;
+  border-right: 1px solid #ffffff;
+  border-bottom: 1px solid #ffffff;
+  height: 16px;
+  position: relative;
+  overflow: hidden;
+}
+
+.win-progress-bar {
+  height: 100%;
+  background: repeating-linear-gradient(
+    90deg,
+    #000080 0px,
+    #000080 8px,
+    #ffffff 8px,
+    #ffffff 10px
+  );
+}
+
+.win-progress-bar-done {
+  height: 100%;
+  background: repeating-linear-gradient(
+    90deg,
+    #008000 0px,
+    #008000 8px,
+    #ffffff 8px,
+    #ffffff 10px
+  );
+}
+
+.win-progress-bar-paused {
+  height: 100%;
+  background: repeating-linear-gradient(
+    90deg,
+    #808080 0px,
+    #808080 8px,
+    #ffffff 8px,
+    #ffffff 10px
+  );
+}
+
+/* Fieldset / Groupbox */
+.win-fieldset {
+  border: 2px groove #ffffff;
+  padding: 8px 12px;
+  margin-top: 6px;
+  position: relative;
+}
+
+.win-fieldset legend {
+  padding: 0 4px;
+  font-size: 11px;
+  font-weight: bold;
+  color: #000000;
+}
+
+/* Custom 90s scrollbars */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 16px;
+  height: 16px;
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-background;
+  background-color: #c0c0c0;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-border rounded-full hover:bg-text-muted;
+  background-color: #c0c0c0;
+  border-top: 2px solid #ffffff;
+  border-left: 2px solid #ffffff;
+  border-right: 2px solid #404040;
+  border-bottom: 2px solid #404040;
+}
+
+::-webkit-scrollbar-thumb:active {
+  background-color: #b0b0b0;
+  border-top: 2px solid #404040;
+  border-left: 2px solid #404040;
+  border-right: 2px solid #ffffff;
+  border-bottom: 2px solid #ffffff;
 }
