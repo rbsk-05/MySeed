@@ -1,47 +1,24 @@
 @echo off
-title Torrent Downloader Launcher
-echo ==================================================
-echo         Torrent Downloader Launcher
-echo ==================================================
-echo.
+title CineTorrent Launcher
+cd /d "%~dp0"
 
-:: Check virtual environment
-if exist "venv\Scripts\python.exe" goto check_frontend
-echo [ERROR] Python virtual environment (venv) not found!
-echo Please make sure venv is created at the project root.
-pause
-exit /b
+if not exist venv\Scripts\python.exe goto no_venv
+if not exist frontend\dist\index.html goto build_frontend
+goto start_launcher
 
-:check_frontend
-:: Check if frontend is built
-if exist "frontend\dist\index.html" goto start_backend
-echo [INFO] Frontend build not found. Building frontend now...
+:build_frontend
+echo [INFO] Building frontend bundle...
 cd frontend
-
-if exist "node_modules" goto build_only
-echo [INFO] Installing frontend dependencies...
-call npm install
-
-:build_only
-echo [INFO] Building frontend production bundle...
+if not exist node_modules call npm install
 call npm run build
 cd ..
 
-:start_backend
-:: Start Backend in a new window
-echo [INFO] Starting Backend Server on http://localhost:8000...
-start "Torrent Downloader Backend" cmd /c ".\venv\Scripts\python.exe -m uvicorn backend.main:app --host 0.0.0.0 --port 8000"
+:start_launcher
+.\venv\Scripts\python.exe -u launcher.py
+if errorlevel 1 pause
+exit /b
 
-echo.
-echo ==================================================
-echo  Backend is running at http://localhost:8000
-echo ==================================================
-echo.
-
-:: Automatically generate a public link
-echo [INFO] Generating public access link via Localtunnel...
-echo.
-echo --------------------------------------------------
-echo Copy the public URL generated below to your devices!
-echo --------------------------------------------------
-npx localtunnel --port 8000
+:no_venv
+echo [ERROR] Python virtual environment (venv) not found!
+pause
+exit /b
