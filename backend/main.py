@@ -53,12 +53,16 @@ app.include_router(ws.router, prefix=settings.API_V1_STR)
 
 # Serve the compiled React frontend natively
 import os
+import sys
 from fastapi.staticfiles import StaticFiles
 
-frontend_dist = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "dist")
+if hasattr(sys, '_MEIPASS'):
+    frontend_dist = os.path.join(sys._MEIPASS, "frontend", "dist")
+else:
+    frontend_dist = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "dist")
+
 if os.path.isdir(frontend_dist):
     app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="static")
 
-# Root route removed in favor of React StaticFiles
 if __name__ == "__main__":
     uvicorn.run("backend.main:app", host=settings.HOST, port=settings.PORT, reload=True)

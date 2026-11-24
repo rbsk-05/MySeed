@@ -10,7 +10,7 @@ def test_get_settings_open_access(client):
 
 def test_update_settings(client):
     new_settings = {
-        "download_dir": "C:\\Users\\mdars\\Downloads",
+        "download_dir": "C:\\Downloads",
         "max_active_downloads": 5,
         "max_download_speed": 1024,
         "max_upload_speed": 512

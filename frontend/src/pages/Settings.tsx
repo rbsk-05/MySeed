@@ -75,7 +75,8 @@ export const SettingsPage = ({ onBack }: { onBack?: () => void }) => {
   // Determine paths for quick picks: Downloads, D Drive, and Recent/Current
   const downloadsPath =
     browseInfo?.quick_locations?.find((l) => l.name.toLowerCase() === 'downloads')?.path ||
-    'C:\\Users\\mdars\\Downloads';
+    currentSettings?.download_dir ||
+    '';
 
   const dDrivePath =
     browseInfo?.drives?.find((d) => d.toUpperCase().startsWith('D:')) || 'D:\\';
@@ -140,7 +141,7 @@ export const SettingsPage = ({ onBack }: { onBack?: () => void }) => {
                   value={formData.download_dir}
                   onChange={handleChange}
                   className="flex-1 bg-[#f7f4ed] border-1.5 border-[#e2d9cb] rounded-2xl px-4 py-2.5 text-xs font-mono text-[#292524] focus:outline-none focus:border-[#ea580c] transition-colors"
-                  placeholder="e.g. C:\Users\mdars\Downloads"
+                  placeholder="e.g. C:\Downloads or /home/user/downloads"
                   required
                 />
                 <button

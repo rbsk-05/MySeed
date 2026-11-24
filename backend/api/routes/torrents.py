@@ -23,7 +23,7 @@ async def upload_torrent(
     if not filename.lower().endswith('.torrent'):
         raise HTTPException(status_code=400, detail="Must be a .torrent file")
         
-    temp_dir = "./temp"
+    temp_dir = settings.TEMP_DIR
     os.makedirs(temp_dir, exist_ok=True)
     safe_name = f"{uuid.uuid4().hex}_{os.path.basename(filename)}"
     temp_path = os.path.join(temp_dir, safe_name)

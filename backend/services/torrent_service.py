@@ -61,7 +61,7 @@ class TorrentService:
             info_hash = str(handle.info_hash())
             
             # Save torrent file to persistent store
-            storage_dir = "./data/torrents"
+            storage_dir = settings.TORRENTS_STORAGE_DIR
             os.makedirs(storage_dir, exist_ok=True)
             persistent_torrent_path = os.path.join(storage_dir, f"{info_hash}.torrent")
             if not os.path.exists(persistent_torrent_path):
@@ -87,7 +87,7 @@ class TorrentService:
 
     def restore_torrents(self, db: Session):
         db_torrents = torrent_repo.get_all(db)
-        storage_dir = "./data/torrents"
+        storage_dir = settings.TORRENTS_STORAGE_DIR
         for db_t in db_torrents:
             if not torrent_engine.get_torrent(db_t.info_hash):
                 persistent_torrent_path = os.path.join(storage_dir, f"{db_t.info_hash}.torrent")
@@ -233,7 +233,7 @@ class TorrentService:
                 pass
 
         # 3. Remove persistent .torrent metadata file
-        storage_dir = "./data/torrents"
+        storage_dir = settings.TORRENTS_STORAGE_DIR
         persistent_torrent_path = os.path.join(storage_dir, f"{torrent.info_hash}.torrent")
         if os.path.exists(persistent_torrent_path):
             try:
