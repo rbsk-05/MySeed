@@ -1,13 +1,20 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getSettings, updateSettings } from '../api/settings';
+import { getSettings, updateSettings, browseDirectory } from '../api/settings';
 import type { SettingsUpdate } from '../api/settings';
+import { DirectoryPickerModal } from '../components/DirectoryPickerModal';
 
 export const SettingsPage = ({ onBack }: { onBack?: () => void }) => {
   const queryClient = useQueryClient();
   const { data: currentSettings, isLoading } = useQuery({
     queryKey: ['settings'],
     queryFn: getSettings,
+  });
+
+  const { data: browseInfo } = useQuery({
+    queryKey: ['browse-directory-quick'],
+    queryFn: () => browseDirectory(),
+    staleTime: 60000,
   });
 
   const [formData, setFormData] = useState<SettingsUpdate>({
@@ -18,6 +25,10 @@ export const SettingsPage = ({ onBack }: { onBack?: () => void }) => {
   });
 
   const [toastMessage, setToastMessage] = useState('');
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const [recentDir, setRecentDir] = useState<string>(() => {
+    return localStorage.getItem('torrent_recent_dir') || '';
+  });
 
   useEffect(() => {
     if (currentSettings) {
@@ -27,6 +38,11 @@ export const SettingsPage = ({ onBack }: { onBack?: () => void }) => {
         max_download_speed: currentSettings.max_download_speed,
         max_upload_speed: currentSettings.max_upload_speed,
       });
+
+      if (!localStorage.getItem('torrent_recent_dir') && currentSettings.download_dir) {
+        localStorage.setItem('torrent_recent_dir', currentSettings.download_dir);
+        setRecentDir(currentSettings.download_dir);
+      }
     }
   }, [currentSettings]);
 
@@ -34,6 +50,10 @@ export const SettingsPage = ({ onBack }: { onBack?: () => void }) => {
     mutationFn: updateSettings,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['settings'] });
+      if (formData.download_dir) {
+        localStorage.setItem('torrent_recent_dir', formData.download_dir);
+        setRecentDir(formData.download_dir);
+      }
       setToastMessage('Settings saved');
       setTimeout(() => setToastMessage(''), 3000);
     },
@@ -51,6 +71,24 @@ export const SettingsPage = ({ onBack }: { onBack?: () => void }) => {
     e.preventDefault();
     mutation.mutate(formData);
   };
+
+  // Determine paths for quick picks: Downloads, D Drive, and Recent/Current
+  const downloadsPath =
+    browseInfo?.quick_locations?.find((l) => l.name.toLowerCase() === 'downloads')?.path ||
+    'C:\\Users\\mdars\\Downloads';
+
+  const dDrivePath =
+    browseInfo?.drives?.find((d) => d.toUpperCase().startsWith('D:')) || 'D:\\';
+
+  const recentPath = recentDir || currentSettings?.download_dir || '';
+  const recentName = recentPath
+    ? recentPath.split(/[\\/]/).filter(Boolean).pop() || recentPath
+    : '';
+
+  const isRecentDistinct =
+    Boolean(recentPath) &&
+    recentPath.toLowerCase() !== downloadsPath.toLowerCase() &&
+    recentPath.toLowerCase() !== dDrivePath.toLowerCase();
 
   if (isLoading) {
     return (
@@ -77,9 +115,9 @@ export const SettingsPage = ({ onBack }: { onBack?: () => void }) => {
           <button 
             type="button" 
             onClick={onBack}
-            className="chill-btn text-xs"
+            className="chill-btn text-xs font-semibold"
           >
-            ← Back
+            Back
           </button>
         )}
       </div>
@@ -95,16 +133,74 @@ export const SettingsPage = ({ onBack }: { onBack?: () => void }) => {
               <label className="block text-xs font-semibold text-[#78716c] mb-1.5">
                 Download Path:
               </label>
-              <input
-                type="text"
-                name="download_dir"
-                value={formData.download_dir}
-                onChange={handleChange}
-                className="w-full bg-[#f7f4ed] border-1.5 border-[#e2d9cb] rounded-2xl px-4 py-2.5 text-xs font-mono text-[#292524] focus:outline-none focus:border-[#ea580c] transition-colors"
-                required
-              />
-              <p className="text-[11px] text-[#a8a29e] mt-1.5">
-                Directory where downloaded files are saved.
+              <div className="flex gap-2 items-center">
+                <input
+                  type="text"
+                  name="download_dir"
+                  value={formData.download_dir}
+                  onChange={handleChange}
+                  className="flex-1 bg-[#f7f4ed] border-1.5 border-[#e2d9cb] rounded-2xl px-4 py-2.5 text-xs font-mono text-[#292524] focus:outline-none focus:border-[#ea580c] transition-colors"
+                  placeholder="e.g. C:\Users\mdars\Downloads"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setIsPickerOpen(true)}
+                  className="chill-btn text-xs py-2.5 px-3.5 font-bold shrink-0 bg-[#f5f0e8] hover:bg-[#ede4d6] text-[#292524]"
+                  title="Open folder browser"
+                >
+                  Locate Folder
+                </button>
+              </div>
+
+              {/* Quick Pick: Only Downloads, D drive, and Recently selected folder */}
+              <div className="flex flex-wrap items-center gap-2 mt-2.5">
+                <span className="text-[11px] font-semibold text-[#a8a29e] mr-1">Quick pick:</span>
+
+                <button
+                  type="button"
+                  onClick={() => setFormData((prev) => ({ ...prev, download_dir: downloadsPath }))}
+                  className={`chill-btn text-[11px] py-1 px-3 font-semibold transition-all ${
+                    formData.download_dir.toLowerCase() === downloadsPath.toLowerCase()
+                      ? 'bg-[#ea580c] text-white border-[#c2410c] shadow-xs'
+                      : 'bg-[#faf6ee] hover:bg-[#f2ebdf] text-[#57534e]'
+                  }`}
+                  title={downloadsPath}
+                >
+                  Downloads
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setFormData((prev) => ({ ...prev, download_dir: dDrivePath }))}
+                  className={`chill-btn text-[11px] py-1 px-3 font-semibold transition-all ${
+                    formData.download_dir.toLowerCase() === dDrivePath.toLowerCase()
+                      ? 'bg-[#ea580c] text-white border-[#c2410c] shadow-xs'
+                      : 'bg-[#faf6ee] hover:bg-[#f2ebdf] text-[#57534e]'
+                  }`}
+                  title={dDrivePath}
+                >
+                  D Drive
+                </button>
+
+                {isRecentDistinct && (
+                  <button
+                    type="button"
+                    onClick={() => setFormData((prev) => ({ ...prev, download_dir: recentPath }))}
+                    className={`chill-btn text-[11px] py-1 px-3 font-semibold transition-all ${
+                      formData.download_dir.toLowerCase() === recentPath.toLowerCase()
+                        ? 'bg-[#ea580c] text-white border-[#c2410c] shadow-xs'
+                        : 'bg-[#faf6ee] hover:bg-[#f2ebdf] text-[#57534e]'
+                    }`}
+                    title={recentPath}
+                  >
+                    Recent: {recentName}
+                  </button>
+                )}
+              </div>
+
+              <p className="text-[11px] text-[#a8a29e] mt-2">
+                Files will be saved to this folder. Use the quick pick shortcuts above or click Locate Folder to browse.
               </p>
             </div>
           </div>
@@ -171,7 +267,7 @@ export const SettingsPage = ({ onBack }: { onBack?: () => void }) => {
             <div>
               {toastMessage ? (
                 <span className="text-xs font-bold text-[#15803d] bg-[#dcfce7] border border-[#86efac] px-3 py-1 rounded-full animate-in fade-in">
-                  ✓ {toastMessage}
+                  {toastMessage}
                 </span>
               ) : (
                 <span />
@@ -183,7 +279,7 @@ export const SettingsPage = ({ onBack }: { onBack?: () => void }) => {
                 <button 
                   type="button" 
                   onClick={onBack}
-                  className="chill-btn text-xs"
+                  className="chill-btn text-xs font-semibold"
                 >
                   Cancel
                 </button>
@@ -191,7 +287,7 @@ export const SettingsPage = ({ onBack }: { onBack?: () => void }) => {
               <button 
                 type="submit" 
                 disabled={mutation.isPending}
-                className="chill-btn chill-btn-primary text-xs"
+                className="chill-btn chill-btn-primary text-xs font-bold"
               >
                 {mutation.isPending ? 'Saving...' : 'Save Settings'}
               </button>
@@ -199,6 +295,20 @@ export const SettingsPage = ({ onBack }: { onBack?: () => void }) => {
           </div>
         </form>
       </div>
+
+      {/* Directory Picker Modal */}
+      <DirectoryPickerModal
+        isOpen={isPickerOpen}
+        onClose={() => setIsPickerOpen(false)}
+        initialPath={formData.download_dir}
+        onSelect={(path) => {
+          setFormData((prev) => ({ ...prev, download_dir: path }));
+          localStorage.setItem('torrent_recent_dir', path);
+          setRecentDir(path);
+          setToastMessage(`Selected: ${path}`);
+          setTimeout(() => setToastMessage(''), 3000);
+        }}
+      />
     </div>
   );
 };

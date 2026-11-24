@@ -9,6 +9,7 @@ interface TorrentCardProps {
   variant?: 'default' | 'compact';
   isSelected?: boolean;
   onToggleSelect?: (id: number) => void;
+  isSelectMode?: boolean;
 }
 
 const formatBytes = (bytes: number, decimals = 1) => {
@@ -101,33 +102,54 @@ export const TorrentCard: React.FC<TorrentCardProps> = ({
   onRemove,
   variant = 'default',
   isSelected = false,
-  onToggleSelect
+  onToggleSelect,
+  isSelectMode = false
 }) => {
-  const isPaused = torrent.is_paused || torrent.status === 'paused';
+  const isQueued = torrent.status === 'queued';
+  const isPaused = (torrent.is_paused || torrent.status === 'paused') && !isQueued;
   const isCompleted = torrent.progress >= 100 || torrent.status === 'finished' || torrent.status === 'seeding';
   const progressPercent = Math.min(100, Math.max(0, torrent.progress)).toFixed(1);
   const numProgress = parseFloat(progressPercent);
-  const isActivelyRolling = !isPaused && !isCompleted && torrent.download_speed > 0;
+  const isActivelyRolling = !isPaused && !isQueued && !isCompleted && torrent.download_speed > 0;
+  const showCheckbox = isSelectMode || isSelected;
+
+  const handleCardClick = () => {
+    // When multi-select mode is active, a single click anywhere on the card toggles selection!
+    if (isSelectMode && onToggleSelect) {
+      onToggleSelect(torrent.id);
+    }
+  };
+
+  const handleCardDoubleClick = () => {
+    // When multi-select is not active yet, double-click activates multi-select and selects this card
+    if (!isSelectMode && onToggleSelect) {
+      onToggleSelect(torrent.id);
+    }
+  };
 
   // Distinct Compact Card Ratio for completed items in "All Titles"
   if (variant === 'compact') {
     return (
-      <div className={`chill-card p-3 transition-all duration-200 hover:shadow-xs flex flex-col justify-between bg-[#fffdf9] border border-[#e8dfd1] rounded-2xl h-full ${
-        isSelected ? 'ring-2 ring-[#ea580c] bg-[#fffbf5]' : ''
-      }`}>
-        {/* Top: Checkbox, Title & Action Controls */}
+      <div 
+        onClick={handleCardClick}
+        onDoubleClick={handleCardDoubleClick}
+        className={`chill-card p-3 transition-all duration-200 hover:shadow-xs flex flex-col justify-between bg-[#fffdf9] border border-[#e8dfd1] rounded-2xl h-full select-none cursor-pointer ${
+          isSelected ? 'ring-2 ring-[#ea580c] bg-[#fffbf5]' : ''
+        }`}
+      >
+        {/* Top: Checkbox (on double-click / select mode), Title & Action Controls */}
         <div className="flex items-center justify-between gap-2 mb-2">
           <div className="flex items-center gap-1.5 min-w-0 flex-1">
-            {onToggleSelect && (
+            {showCheckbox && onToggleSelect && (
               <input 
                 type="checkbox"
                 checked={isSelected}
                 onChange={() => onToggleSelect(torrent.id)}
-                className="w-3.5 h-3.5 rounded border-[#d6cbb9] text-[#ea580c] focus:ring-0 cursor-pointer accent-[#ea580c] shrink-0"
+                onClick={(e) => e.stopPropagation()}
+                className="w-3.5 h-3.5 rounded border-[#d6cbb9] text-[#ea580c] focus:ring-0 cursor-pointer accent-[#ea580c] shrink-0 animate-in fade-in duration-150"
                 title="Select for bulk action"
               />
             )}
-            <span className="text-xs select-none" title="Ready to Screen">🍿</span>
             <h3 className="text-xs sm:text-sm font-bold text-[#292524] truncate" title={torrent.name}>
               {torrent.name || 'Untitled Torrent'}
             </h3>
@@ -136,25 +158,33 @@ export const TorrentCard: React.FC<TorrentCardProps> = ({
           <div className="flex items-center gap-1 shrink-0">
             {isPaused ? (
               <button 
-                onClick={() => onResume(torrent.id)}
-                className="chill-btn bg-[#dcfce7] text-[#15803d] border-[#86efac] hover:bg-[#bbf7d0] text-[10px] py-0.5 px-2 font-semibold"
-                title="Resume"
+                onClick={(e) => { e.stopPropagation(); onResume(torrent.id); }}
+                className="chill-btn bg-[#dcfce7] text-[#15803d] border-[#86efac] hover:bg-[#bbf7d0] min-w-[24px] min-h-[24px] w-6 h-6 p-0 flex items-center justify-center font-bold shrink-0"
+                title="Resume seeding"
+                aria-label="Resume"
               >
-                Resume
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="#15803d" className="shrink-0 translate-x-0.5">
+                  <path d="M5 3.868v16.264c0 .82.89 1.328 1.594.908l13.553-8.132a1.055 1.055 0 0 0 0-1.816L6.594 2.96C5.89 2.54 5 3.048 5 3.868z" />
+                </svg>
               </button>
             ) : (
               <button 
-                onClick={() => onPause(torrent.id)}
-                className="chill-btn text-[#78716c] hover:text-[#292524] text-[10px] py-0.5 px-2 font-semibold"
-                title="Pause"
+                onClick={(e) => { e.stopPropagation(); onPause(torrent.id); }}
+                className="chill-btn text-[#57534e] hover:text-[#292524] min-w-[24px] min-h-[24px] w-6 h-6 p-0 flex items-center justify-center font-bold shrink-0"
+                title="Pause seeding"
+                aria-label="Pause"
               >
-                Pause
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="#57534e" className="shrink-0">
+                  <rect x="5" y="4" width="4" height="16" rx="1" />
+                  <rect x="15" y="4" width="4" height="16" rx="1" />
+                </svg>
               </button>
             )}
             <button 
-              onClick={() => onRemove(torrent.id)}
-              className="chill-btn text-[#b91c1c] hover:bg-[#fee2e2] hover:border-[#fca5a5] text-[10px] py-0.5 px-1.5 font-bold"
+              onClick={(e) => { e.stopPropagation(); onRemove(torrent.id); }}
+              className="chill-btn text-[#b91c1c] hover:bg-[#fee2e2] hover:border-[#fca5a5] min-w-[24px] min-h-[24px] w-6 h-6 p-0 flex items-center justify-center text-xs font-bold shrink-0"
               title="Remove"
+              aria-label="Remove"
             >
               ✕
             </button>
@@ -217,6 +247,13 @@ export const TorrentCard: React.FC<TorrentCardProps> = ({
     if (isCompleted) {
       return null;
     }
+    if (isQueued) {
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#fef3c7] text-[#b45309] border border-[#fde68a]">
+          Queued
+        </span>
+      );
+    }
     if (isPaused) {
       return (
         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#f5f5f4] text-[#78716c] border border-[#d6d3d1]">
@@ -250,18 +287,23 @@ export const TorrentCard: React.FC<TorrentCardProps> = ({
   };
 
   return (
-    <div className={`chill-card p-3 sm:p-3.5 mb-2.5 transition-all duration-200 hover:shadow-xs ${
-      isSelected ? 'ring-2 ring-[#ea580c] bg-[#fffbf5]' : ''
-    }`}>
-      {/* Top Row: Checkbox, Title, Inline Status Badge, and Action Buttons (Space-optimized) */}
+    <div 
+      onClick={handleCardClick}
+      onDoubleClick={handleCardDoubleClick}
+      className={`chill-card p-3 sm:p-3.5 mb-2.5 transition-all duration-200 hover:shadow-xs select-none cursor-pointer ${
+        isSelected ? 'ring-2 ring-[#ea580c] bg-[#fffbf5]' : ''
+      }`}
+    >
+      {/* Top Row: Checkbox (on double-click / select mode), Title, Inline Status Badge, and Action Buttons (Space-optimized) */}
       <div className="flex items-center justify-between gap-2.5 mb-2">
         <div className="flex items-center gap-2 min-w-0 flex-1">
-          {onToggleSelect && (
+          {showCheckbox && onToggleSelect && (
             <input 
               type="checkbox"
               checked={isSelected}
               onChange={() => onToggleSelect(torrent.id)}
-              className="w-4 h-4 rounded border-[#d6cbb9] text-[#ea580c] focus:ring-0 cursor-pointer accent-[#ea580c] shrink-0"
+              onClick={(e) => e.stopPropagation()}
+              className="w-4 h-4 rounded border-[#d6cbb9] text-[#ea580c] focus:ring-0 cursor-pointer accent-[#ea580c] shrink-0 animate-in fade-in duration-150"
               title="Select for bulk action"
             />
           )}
@@ -275,7 +317,7 @@ export const TorrentCard: React.FC<TorrentCardProps> = ({
         <div className="flex items-center gap-1.5 shrink-0">
           {isPaused ? (
             <button 
-              onClick={() => onResume(torrent.id)}
+              onClick={(e) => { e.stopPropagation(); onResume(torrent.id); }}
               className="chill-btn bg-[#dcfce7] text-[#15803d] border-[#86efac] hover:bg-[#bbf7d0] text-xs py-1 px-2.5"
               title="Resume"
             >
@@ -283,7 +325,7 @@ export const TorrentCard: React.FC<TorrentCardProps> = ({
             </button>
           ) : (
             <button 
-              onClick={() => onPause(torrent.id)}
+              onClick={(e) => { e.stopPropagation(); onPause(torrent.id); }}
               className="chill-btn text-[#78716c] hover:text-[#292524] text-xs py-1 px-2.5"
               title="Pause"
             >
@@ -291,7 +333,7 @@ export const TorrentCard: React.FC<TorrentCardProps> = ({
             </button>
           )}
           <button 
-            onClick={() => onRemove(torrent.id)}
+            onClick={(e) => { e.stopPropagation(); onRemove(torrent.id); }}
             className="chill-btn text-[#b91c1c] hover:bg-[#fee2e2] hover:border-[#fca5a5] text-xs py-1 px-2"
             title="Remove"
           >
@@ -323,7 +365,9 @@ export const TorrentCard: React.FC<TorrentCardProps> = ({
                 ? 'bg-gradient-to-r from-[#15803d] to-[#22c55e]' 
                 : isPaused
                   ? 'bg-gradient-to-r from-[#78716c] to-[#a8a29e]'
-                  : 'bg-gradient-to-r from-[#b45309] via-[#ea580c] to-[#f59e0b]'
+                  : isQueued
+                    ? 'bg-gradient-to-r from-[#d97706] to-[#f59e0b]'
+                    : 'bg-gradient-to-r from-[#b45309] via-[#ea580c] to-[#f59e0b]'
             }`}
             style={{ width: `${Math.max(2, numProgress)}%` }}
           >
@@ -354,7 +398,7 @@ export const TorrentCard: React.FC<TorrentCardProps> = ({
             >
               <CinemaProjectorSVG 
                 isRolling={isActivelyRolling} 
-                isPaused={isPaused} 
+                isPaused={isPaused || isQueued} 
               />
             </div>
           )}
@@ -399,7 +443,7 @@ export const TorrentCard: React.FC<TorrentCardProps> = ({
           <div className="flex items-center gap-1 font-medium">
             <span>⏱️</span>
             <span className="text-[#78716c] text-xs">
-              {isCompleted ? 'Complete' : isPaused ? 'Paused' : formatETA(torrent.eta)}
+              {isCompleted ? 'Complete' : isQueued ? 'Queued' : isPaused ? 'Paused' : formatETA(torrent.eta)}
             </span>
           </div>
 

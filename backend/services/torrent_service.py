@@ -94,6 +94,10 @@ class TorrentService:
                 if os.path.exists(persistent_torrent_path):
                     handle = torrent_engine.add_torrent_file(persistent_torrent_path, db_t.save_path)
                     if db_t.is_paused:
+                        try:
+                            handle.unset_flags(lt.torrent_flags.auto_managed)
+                        except Exception:
+                            pass
                         handle.pause()
 
     def get_all_torrents(self, db: Session) -> List[dict]:
@@ -127,7 +131,20 @@ class TorrentService:
             }
 
             if stats:
-                is_p = stats.get("is_paused", db_t.is_paused) or stats.get("state") == "paused"
+                is_user_paused = bool(db_t.is_paused)
+                raw_state = stats.get("state", db_t.status)
+                is_engine_queued = (raw_state == "queued" or stats.get("is_queued", False))
+
+                if is_user_paused:
+                    final_is_paused = True
+                    final_status = "paused"
+                elif is_engine_queued or (stats.get("is_paused") and not is_user_paused):
+                    final_is_paused = False
+                    final_status = "queued"
+                else:
+                    final_is_paused = False
+                    final_status = raw_state
+
                 t_dict.update({
                     "name": stats["name"] if stats.get("name") and stats.get("name") != "Downloading Metadata..." else db_t.name,
                     "progress": stats.get("progress", 0.0),
@@ -138,10 +155,10 @@ class TorrentService:
                     "seeds": stats.get("seeds", 0),
                     "downloaded": stats.get("downloaded", 0),
                     "uploaded": stats.get("uploaded", 0),
-                    "state": stats.get("state", db_t.status),
-                    "is_paused": is_p,
+                    "state": final_status,
+                    "is_paused": final_is_paused,
                     "error": stats.get("error"),
-                    "status": "paused" if is_p else stats.get("state", db_t.status)
+                    "status": final_status
                 })
                 # If size wasn't set, update from engine
                 if (not db_t.size or db_t.size == 0) and stats.get("size"):

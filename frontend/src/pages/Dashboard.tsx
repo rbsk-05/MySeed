@@ -10,6 +10,7 @@ export const Dashboard: React.FC = () => {
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [deleteFilesOnDisk, setDeleteFilesOnDisk] = useState<boolean>(false);
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState<boolean>(false);
   const queryClient = useQueryClient();
 
   useTorrentWebSocket();
@@ -51,10 +52,12 @@ export const Dashboard: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['torrents'] });
       setSelectedIds(new Set());
+      setIsConfirmingDelete(false);
     },
     onError: () => {
       queryClient.invalidateQueries({ queryKey: ['torrents'] });
       setSelectedIds(new Set());
+      setIsConfirmingDelete(false);
     },
   });
 
@@ -96,19 +99,15 @@ export const Dashboard: React.FC = () => {
 
   const clearSelection = () => {
     setSelectedIds(new Set());
+    setIsConfirmingDelete(false);
   };
 
-  const handleBulkDelete = () => {
+  const executeBulkDelete = () => {
     if (selectedIds.size === 0) return;
-    const confirmMsg = deleteFilesOnDisk
-      ? `Delete ${selectedIds.size} torrent(s) AND remove their files from disk?`
-      : `Remove ${selectedIds.size} torrent(s)?`;
-    if (window.confirm(confirmMsg)) {
-      bulkDeleteMutation.mutate({
-        ids: Array.from(selectedIds),
-        deleteFiles: deleteFilesOnDisk,
-      });
-    }
+    bulkDeleteMutation.mutate({
+      ids: Array.from(selectedIds),
+      deleteFiles: deleteFilesOnDisk,
+    });
   };
 
   return (
@@ -210,6 +209,7 @@ export const Dashboard: React.FC = () => {
                       torrent={torrent}
                       variant="default"
                       isSelected={selectedIds.has(torrent.id)}
+                      isSelectMode={selectedIds.size > 0}
                       onToggleSelect={toggleSelect}
                       onPause={(id) => pauseMutation.mutate(id)}
                       onResume={(id) => resumeMutation.mutate(id)}
@@ -238,6 +238,7 @@ export const Dashboard: React.FC = () => {
                         torrent={torrent}
                         variant="compact"
                         isSelected={selectedIds.has(torrent.id)}
+                        isSelectMode={selectedIds.size > 0}
                         onToggleSelect={toggleSelect}
                         onPause={(id) => pauseMutation.mutate(id)}
                         onResume={(id) => resumeMutation.mutate(id)}
@@ -277,6 +278,7 @@ export const Dashboard: React.FC = () => {
                 torrent={torrent}
                 variant="default"
                 isSelected={selectedIds.has(torrent.id)}
+                isSelectMode={selectedIds.size > 0}
                 onToggleSelect={toggleSelect}
                 onPause={(id) => pauseMutation.mutate(id)}
                 onResume={(id) => resumeMutation.mutate(id)}
@@ -287,50 +289,87 @@ export const Dashboard: React.FC = () => {
         )}
       </div>
 
-      {/* Floating Bulk Action Bar - Warm Dark Beige matching the cozy cinephile aesthetic */}
+      {/* Floating Bulk Action Bar - Tactile Shadow Theme matching .chill-btn */}
       {selectedIds.size > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-3 duration-200">
-          <div className="bg-[#e4d7c3] text-[#292524] px-5 py-3 shadow-xl border-2 border-[#c5b59d] flex items-center gap-3.5 rounded-2xl select-none">
-            {/* Selected Count Badge & Text */}
-            <div className="flex items-center gap-2">
-              <span className="w-5 h-5 rounded-full bg-[#ea580c] text-white flex items-center justify-center text-[11px] font-mono font-black shadow-xs">
-                {selectedIds.size}
-              </span>
-              <span className="text-xs font-black text-[#292524] tracking-wide">
-                Selected
-              </span>
-            </div>
+          <div 
+            className="bg-[#eee7dc] text-[#292524] px-5 py-3 border-[1.5px] border-[#d8cfc0] flex items-center gap-3.5 rounded-2xl select-none"
+            style={{
+              boxShadow: '0 4px 0 0 #cfc3b0, 0 14px 30px -4px rgba(41, 37, 36, 0.15)'
+            }}
+          >
+            {isConfirmingDelete ? (
+              /* In-App Inline Confirmation with Tactile Shadows */
+              <div className="flex items-center gap-3 animate-in fade-in duration-150">
+                <span className="text-xs font-black text-[#b91c1c]">
+                  Delete {selectedIds.size} {selectedIds.size === 1 ? 'title' : 'titles'}
+                  {deleteFilesOnDisk ? ' & files from disk' : ''}?
+                </span>
 
-            <div className="h-4 w-px bg-[#c5b59d]" />
+                <button
+                  onClick={executeBulkDelete}
+                  disabled={bulkDeleteMutation.isPending}
+                  className="chill-btn bg-[#dc2626] hover:bg-[#ef4444] text-white border-[#b91c1c] text-xs py-1.5 px-3.5 font-bold cursor-pointer transition-all shadow-[0_2px_0_0_#991b1b] hover:shadow-[0_3px_0_0_#991b1b] active:shadow-[0_1px_0_0_#991b1b]"
+                >
+                  {bulkDeleteMutation.isPending ? 'Deleting...' : 'Yes, Delete'}
+                </button>
 
-            {/* Delete Files Checkbox - Cozy Beige Capsule */}
-            <label className="flex items-center gap-2 text-xs font-bold text-[#292524] cursor-pointer select-none bg-[#f2e9dc] px-2.5 py-1.5 rounded-lg border border-[#c5b59d] hover:border-[#ea580c] transition-colors">
-              <input 
-                type="checkbox"
-                checked={deleteFilesOnDisk}
-                onChange={(e) => setDeleteFilesOnDisk(e.target.checked)}
-                className="w-4 h-4 rounded border-[#a89880] text-[#ea580c] focus:ring-0 cursor-pointer accent-[#ea580c]"
-              />
-              <span className="text-[#292524] font-bold">Delete files from disk</span>
-            </label>
+                <button
+                  onClick={() => setIsConfirmingDelete(false)}
+                  className="chill-btn text-xs font-bold text-[#78716c] hover:text-[#292524] py-1 px-3"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              /* Standard Selection Toolbar */
+              <>
+                {/* Selected Count Badge & Text */}
+                <div className="flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-[#ea580c] text-white flex items-center justify-center text-[11px] font-mono font-black shadow-[0_1.5px_0_0_#9a3412]">
+                    {selectedIds.size}
+                  </span>
+                  <span className="text-xs font-black text-[#292524] tracking-wide">
+                    Selected
+                  </span>
+                </div>
 
-            {/* Bulk Delete Button */}
-            <button
-              onClick={handleBulkDelete}
-              disabled={bulkDeleteMutation.isPending}
-              className="chill-btn bg-[#dc2626] hover:bg-[#ef4444] text-white border-[#b91c1c] text-xs py-1.5 px-3.5 shadow-sm font-bold cursor-pointer transition-all"
-            >
-              {bulkDeleteMutation.isPending ? 'Deleting...' : `Delete (${selectedIds.size})`}
-            </button>
+                <div className="h-4 w-px bg-[#d8cfc0]" />
 
-            {/* Clear Selection Button */}
-            <button
-              onClick={clearSelection}
-              className="text-[#78716c] hover:text-[#292524] text-xs px-1.5 py-0.5 rounded hover:bg-[#d8cab4] transition-colors cursor-pointer font-bold"
-              title="Clear selection"
-            >
-              ✕
-            </button>
+                {/* Delete Files Checkbox - Tactile Ivory Capsule matching button shadows */}
+                <label 
+                  className="flex items-center gap-2 text-xs font-bold text-[#292524] cursor-pointer select-none bg-[#fffdf9] px-3 py-1.5 rounded-full border-[1.5px] border-[#e2d9cb] hover:bg-[#f7f4ed] hover:border-[#d6cbb9] transition-all"
+                  style={{
+                    boxShadow: '0 2px 0 0 #d6cbb9'
+                  }}
+                >
+                  <input 
+                    type="checkbox"
+                    checked={deleteFilesOnDisk}
+                    onChange={(e) => setDeleteFilesOnDisk(e.target.checked)}
+                    className="w-4 h-4 rounded border-[#d8cfc0] text-[#ea580c] focus:ring-0 cursor-pointer accent-[#ea580c]"
+                  />
+                  <span className="text-[#292524] font-bold">Delete files from disk</span>
+                </label>
+
+                {/* Bulk Delete Button with Tactile Red Lip Shadow */}
+                <button
+                  onClick={() => setIsConfirmingDelete(true)}
+                  className="chill-btn bg-[#dc2626] hover:bg-[#ef4444] text-white border-[#b91c1c] text-xs py-1.5 px-3.5 font-bold cursor-pointer transition-all shadow-[0_2px_0_0_#991b1b] hover:shadow-[0_3px_0_0_#991b1b] active:shadow-[0_1px_0_0_#991b1b]"
+                >
+                  Delete ({selectedIds.size})
+                </button>
+
+                {/* Clear Selection Button with chill-btn tactile styling */}
+                <button
+                  onClick={clearSelection}
+                  className="chill-btn text-[#78716c] hover:text-[#292524] text-xs py-1 px-2.5 font-bold"
+                  title="Clear selection"
+                >
+                  ✕
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}

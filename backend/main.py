@@ -18,6 +18,13 @@ async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
         from backend.services.torrent_service import torrent_service
+        from backend.api.routes.settings import get_or_create_settings
+        app_settings_db = get_or_create_settings(db)
+        torrent_engine.apply_session_settings(
+            max_active_downloads=app_settings_db.max_active_downloads,
+            max_download_speed=app_settings_db.max_download_speed,
+            max_upload_speed=app_settings_db.max_upload_speed
+        )
         torrent_service.restore_torrents(db)
     finally:
         db.close()
