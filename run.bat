@@ -1,5 +1,5 @@
 @echo off
-title CineTorrent Launcher
+title MySeed Launcher
 cd /d "%~dp0"
 
 if not exist venv\Scripts\python.exe goto no_venv

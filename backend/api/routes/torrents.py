@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from pydantic import BaseModel
 import shutil
 import os
 import uuid
@@ -68,3 +69,21 @@ async def delete_torrent(
     db: Session = Depends(get_db)
 ):
     return torrent_service.remove_torrent(db, torrent_id, delete_files)
+
+class BulkDeleteRequest(BaseModel):
+    ids: List[int]
+    delete_files: bool = False
+
+@router.post("/bulk-delete")
+async def bulk_delete_torrents(
+    req: BulkDeleteRequest,
+    db: Session = Depends(get_db)
+):
+    deleted = []
+    for tid in req.ids:
+        try:
+            torrent_service.remove_torrent(db, tid, req.delete_files)
+            deleted.append(tid)
+        except Exception:
+            pass
+    return {"deleted": deleted, "count": len(deleted)}

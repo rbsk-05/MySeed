@@ -175,7 +175,47 @@ class TorrentService:
         torrent = torrent_repo.get(db, torrent_id)
         if not torrent:
             raise HTTPException(status_code=404, detail="Torrent not found")
+        
+        # 1. Ask engine to remove torrent from session (and trigger libtorrent file deletion)
         torrent_engine.remove_torrent(torrent.info_hash, delete_files)
+
+        # 2. If delete_files requested, physically remove content directory/files from save_path
+        if delete_files and torrent.save_path and os.path.exists(torrent.save_path):
+            try:
+                if torrent.name and torrent.name != "Downloading Metadata...":
+                    import glob
+                    exact_path = os.path.join(torrent.save_path, torrent.name)
+                    if os.path.isdir(exact_path):
+                        shutil.rmtree(exact_path, ignore_errors=True)
+                    elif os.path.isfile(exact_path):
+                        try:
+                            os.remove(exact_path)
+                        except Exception:
+                            pass
+                    
+                    # Pattern matches for single files, extensions, and partfiles
+                    for m in glob.glob(os.path.join(torrent.save_path, torrent.name + "*")):
+                        try:
+                            if os.path.isdir(m):
+                                shutil.rmtree(m, ignore_errors=True)
+                            elif os.path.isfile(m):
+                                os.remove(m)
+                        except Exception:
+                            pass
+                    
+                    # Hidden dot-files/partfiles matching .<name>*
+                    for m in glob.glob(os.path.join(torrent.save_path, "." + torrent.name + "*")):
+                        try:
+                            if os.path.isdir(m):
+                                shutil.rmtree(m, ignore_errors=True)
+                            elif os.path.isfile(m):
+                                os.remove(m)
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+
+        # 3. Remove persistent .torrent metadata file
         storage_dir = "./data/torrents"
         persistent_torrent_path = os.path.join(storage_dir, f"{torrent.info_hash}.torrent")
         if os.path.exists(persistent_torrent_path):
@@ -183,6 +223,8 @@ class TorrentService:
                 os.remove(persistent_torrent_path)
             except Exception:
                 pass
+
+        # 4. Remove DB record
         torrent_repo.delete(db, torrent_id=torrent_id)
         return {"id": torrent_id, "message": "Torrent deleted successfully"}
 

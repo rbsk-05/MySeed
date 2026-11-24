@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getTorrents, addMagnet, uploadFile, pauseTorrent, resumeTorrent, removeTorrent } from '../api/torrents';
+import { getTorrents, addMagnet, uploadFile, pauseTorrent, resumeTorrent, removeTorrent, bulkDeleteTorrents } from '../api/torrents';
 import { TorrentCard } from '../components/TorrentCard';
 import { AddTorrentModal } from '../components/AddTorrentModal';
 import { useTorrentWebSocket } from '../hooks/useWebSocket';
@@ -8,6 +8,8 @@ import { useTorrentWebSocket } from '../hooks/useWebSocket';
 export const Dashboard: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [deleteFilesOnDisk, setDeleteFilesOnDisk] = useState<boolean>(false);
   const queryClient = useQueryClient();
 
   useTorrentWebSocket();
@@ -43,6 +45,19 @@ export const Dashboard: React.FC = () => {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['torrents'] }),
   });
 
+  const bulkDeleteMutation = useMutation({
+    mutationFn: ({ ids, deleteFiles }: { ids: number[]; deleteFiles: boolean }) =>
+      bulkDeleteTorrents(ids, deleteFiles),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['torrents'] });
+      setSelectedIds(new Set());
+    },
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: ['torrents'] });
+      setSelectedIds(new Set());
+    },
+  });
+
   const activeTorrents = torrents?.filter(t => t.progress < 100 && t.status !== 'finished' && t.status !== 'seeding') || [];
   const completedTorrents = torrents?.filter(t => t.progress >= 100 || t.status === 'finished' || t.status === 'seeding') || [];
 
@@ -52,56 +67,114 @@ export const Dashboard: React.FC = () => {
       ? completedTorrents 
       : (torrents || []);
 
+  const toggleSelect = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleSelectAll = () => {
+    const visibleIds = displayedTorrents.map((t) => t.id);
+    const isAllSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
+    if (isAllSelected) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        visibleIds.forEach((id) => next.delete(id));
+        return next;
+      });
+    } else {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        visibleIds.forEach((id) => next.add(id));
+        return next;
+      });
+    }
+  };
+
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedIds.size === 0) return;
+    const confirmMsg = deleteFilesOnDisk
+      ? `Delete ${selectedIds.size} torrent(s) AND remove their files from disk?`
+      : `Remove ${selectedIds.size} torrent(s)?`;
+    if (window.confirm(confirmMsg)) {
+      bulkDeleteMutation.mutate({
+        ids: Array.from(selectedIds),
+        deleteFiles: deleteFilesOnDisk,
+      });
+    }
+  };
+
   return (
-    <div className="max-w-5xl mx-auto py-8 px-4 sm:px-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-[#292524] tracking-tight">
-            Ciné<span className="text-[#ea580c]">Torrent</span>
-          </h1>
+    <div className="max-w-5xl mx-auto py-6 px-4 sm:px-6">
+      {/* Top Action Bar: Filter tabs on left, Add Torrent on right (Non-repetitive layout) */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-5">
+        {/* Filter Tabs */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 max-w-full">
+          <button
+            onClick={() => setFilter('all')}
+            className={`text-xs font-bold px-3.5 py-1.5 rounded-full transition-all cursor-pointer shrink-0 ${
+              filter === 'all'
+                ? 'bg-[#292524] text-white shadow-xs'
+                : 'bg-[#fffdf9] text-[#78716c] hover:bg-[#f0ebe1] border border-[#e2d9cb]'
+            }`}
+          >
+            All Titles ({torrents?.length || 0})
+          </button>
+          <button
+            onClick={() => setFilter('active')}
+            className={`text-xs font-bold px-3.5 py-1.5 rounded-full transition-all cursor-pointer shrink-0 ${
+              filter === 'active'
+                ? 'bg-[#ea580c] text-white shadow-xs'
+                : 'bg-[#fffdf9] text-[#78716c] hover:bg-[#f0ebe1] border border-[#e2d9cb]'
+            }`}
+          >
+            Now Rolling ({activeTorrents.length})
+          </button>
+          <button
+            onClick={() => setFilter('completed')}
+            className={`text-xs font-bold px-3.5 py-1.5 rounded-full transition-all cursor-pointer shrink-0 ${
+              filter === 'completed'
+                ? 'bg-[#16a34a] text-white shadow-xs'
+                : 'bg-[#fffdf9] text-[#78716c] hover:bg-[#f0ebe1] border border-[#e2d9cb]'
+            }`}
+          >
+            Ready to Screen ({completedTorrents.length})
+          </button>
         </div>
 
-        <button 
-          onClick={() => setIsModalOpen(true)}
-          className="chill-btn chill-btn-primary text-xs shadow-xs"
-        >
-          + Add Torrent
-        </button>
-      </div>
+        {/* Action Controls */}
+        <div className="flex items-center gap-2 shrink-0">
+          {displayedTorrents.length > 0 && (
+            <button
+              onClick={handleSelectAll}
+              className={`chill-btn text-xs cursor-pointer ${
+                selectedIds.size > 0
+                  ? 'bg-[#fed7aa] text-[#c2410c] border-[#f97316]'
+                  : 'text-[#78716c]'
+              }`}
+              title="Select or deselect all visible titles"
+            >
+              {displayedTorrents.every((t) => selectedIds.has(t.id))
+                ? 'Deselect All'
+                : 'Select All'}
+            </button>
+          )}
 
-      {/* Filter Tabs */}
-      <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1">
-        <button
-          onClick={() => setFilter('all')}
-          className={`text-xs font-bold px-3.5 py-1.5 rounded-full transition-all cursor-pointer ${
-            filter === 'all'
-              ? 'bg-[#292524] text-white shadow-xs'
-              : 'bg-[#fffdf9] text-[#78716c] hover:bg-[#f0ebe1] border border-[#e2d9cb]'
-          }`}
-        >
-          All Titles ({torrents?.length || 0})
-        </button>
-        <button
-          onClick={() => setFilter('active')}
-          className={`text-xs font-bold px-3.5 py-1.5 rounded-full transition-all cursor-pointer ${
-            filter === 'active'
-              ? 'bg-[#ea580c] text-white shadow-xs'
-              : 'bg-[#fffdf9] text-[#78716c] hover:bg-[#f0ebe1] border border-[#e2d9cb]'
-          }`}
-        >
-          Now Rolling ({activeTorrents.length})
-        </button>
-        <button
-          onClick={() => setFilter('completed')}
-          className={`text-xs font-bold px-3.5 py-1.5 rounded-full transition-all cursor-pointer ${
-            filter === 'completed'
-              ? 'bg-[#16a34a] text-white shadow-xs'
-              : 'bg-[#fffdf9] text-[#78716c] hover:bg-[#f0ebe1] border border-[#e2d9cb]'
-          }`}
-        >
-          Ready to Screen ({completedTorrents.length})
-        </button>
+          {/* Action Button */}
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="chill-btn chill-btn-primary text-xs shadow-xs shrink-0"
+          >
+            + Add Torrent
+          </button>
+        </div>
       </div>
 
       {/* Main List */}
@@ -110,27 +183,101 @@ export const Dashboard: React.FC = () => {
           <div className="chill-card p-12 text-center text-sm font-medium text-[#78716c] animate-pulse">
             Loading torrents...
           </div>
+        ) : filter === 'all' ? (
+          (torrents?.length || 0) === 0 ? (
+            <div className="chill-card p-12 text-center border-dashed border-2 border-[#e2d9cb]">
+              <h3 className="text-base font-bold text-[#292524] mb-1">
+                No torrents found
+              </h3>
+              <p className="text-xs text-[#78716c] mb-4 max-w-sm mx-auto">
+                Add a magnet link or .torrent file to begin downloading.
+              </p>
+              <button 
+                onClick={() => setIsModalOpen(true)}
+                className="chill-btn chill-btn-primary text-xs"
+              >
+                + Add Torrent
+              </button>
+            </div>
+          ) : (
+            <div>
+              {/* Active Downloads at the top so user immediately sees what is downloading */}
+              {activeTorrents.length > 0 && (
+                <div>
+                  {activeTorrents.map((torrent) => (
+                    <TorrentCard 
+                      key={torrent.id}
+                      torrent={torrent}
+                      variant="default"
+                      isSelected={selectedIds.has(torrent.id)}
+                      onToggleSelect={toggleSelect}
+                      onPause={(id) => pauseMutation.mutate(id)}
+                      onResume={(id) => resumeMutation.mutate(id)}
+                      onRemove={(id) => removeMutation.mutate(id)}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* Ready to Screen / Completed (pushed to the bottom with distinct card ratio) */}
+              {completedTorrents.length > 0 && (
+                <div>
+                  {activeTorrents.length > 0 && (
+                    <div className="flex items-center gap-2.5 mt-4 mb-3">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-[#78716c]">
+                        Ready to Screen ({completedTorrents.length})
+                      </span>
+                      <div className="h-px bg-[#e2d9cb] flex-1" />
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {completedTorrents.map((torrent) => (
+                      <TorrentCard 
+                        key={torrent.id}
+                        torrent={torrent}
+                        variant="compact"
+                        isSelected={selectedIds.has(torrent.id)}
+                        onToggleSelect={toggleSelect}
+                        onPause={(id) => pauseMutation.mutate(id)}
+                        onResume={(id) => resumeMutation.mutate(id)}
+                        onRemove={(id) => removeMutation.mutate(id)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )
         ) : displayedTorrents.length === 0 ? (
           <div className="chill-card p-12 text-center border-dashed border-2 border-[#e2d9cb]">
             <h3 className="text-base font-bold text-[#292524] mb-1">
-              No torrents found
+              {filter === 'active' ? 'No titles currently rolling' : 'No titles ready to screen'}
             </h3>
             <p className="text-xs text-[#78716c] mb-4 max-w-sm mx-auto">
-              Add a magnet link or .torrent file to begin downloading.
+              {filter === 'active' 
+                ? 'All downloads have completed, or no torrents are active.' 
+                : 'Torrents that finish downloading will appear here.'}
             </p>
-            <button 
-              onClick={() => setIsModalOpen(true)}
-              className="chill-btn chill-btn-primary text-xs"
-            >
-              + Add Torrent
-            </button>
+            {filter === 'active' && (
+              <button 
+                onClick={() => setIsModalOpen(true)}
+                className="chill-btn chill-btn-primary text-xs"
+              >
+                + Add Torrent
+              </button>
+            )}
           </div>
         ) : (
+          /* "Now Rolling" or "Ready to Screen" tabs - standard design ratio preserved */
           <div>
             {displayedTorrents.map((torrent) => (
               <TorrentCard 
                 key={torrent.id}
                 torrent={torrent}
+                variant="default"
+                isSelected={selectedIds.has(torrent.id)}
+                onToggleSelect={toggleSelect}
                 onPause={(id) => pauseMutation.mutate(id)}
                 onResume={(id) => resumeMutation.mutate(id)}
                 onRemove={(id) => removeMutation.mutate(id)}
@@ -139,6 +286,54 @@ export const Dashboard: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Floating Bulk Action Bar - Warm Dark Beige matching the cozy cinephile aesthetic */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-3 duration-200">
+          <div className="bg-[#e4d7c3] text-[#292524] px-5 py-3 shadow-xl border-2 border-[#c5b59d] flex items-center gap-3.5 rounded-2xl select-none">
+            {/* Selected Count Badge & Text */}
+            <div className="flex items-center gap-2">
+              <span className="w-5 h-5 rounded-full bg-[#ea580c] text-white flex items-center justify-center text-[11px] font-mono font-black shadow-xs">
+                {selectedIds.size}
+              </span>
+              <span className="text-xs font-black text-[#292524] tracking-wide">
+                Selected
+              </span>
+            </div>
+
+            <div className="h-4 w-px bg-[#c5b59d]" />
+
+            {/* Delete Files Checkbox - Cozy Beige Capsule */}
+            <label className="flex items-center gap-2 text-xs font-bold text-[#292524] cursor-pointer select-none bg-[#f2e9dc] px-2.5 py-1.5 rounded-lg border border-[#c5b59d] hover:border-[#ea580c] transition-colors">
+              <input 
+                type="checkbox"
+                checked={deleteFilesOnDisk}
+                onChange={(e) => setDeleteFilesOnDisk(e.target.checked)}
+                className="w-4 h-4 rounded border-[#a89880] text-[#ea580c] focus:ring-0 cursor-pointer accent-[#ea580c]"
+              />
+              <span className="text-[#292524] font-bold">Delete files from disk</span>
+            </label>
+
+            {/* Bulk Delete Button */}
+            <button
+              onClick={handleBulkDelete}
+              disabled={bulkDeleteMutation.isPending}
+              className="chill-btn bg-[#dc2626] hover:bg-[#ef4444] text-white border-[#b91c1c] text-xs py-1.5 px-3.5 shadow-sm font-bold cursor-pointer transition-all"
+            >
+              {bulkDeleteMutation.isPending ? 'Deleting...' : `Delete (${selectedIds.size})`}
+            </button>
+
+            {/* Clear Selection Button */}
+            <button
+              onClick={clearSelection}
+              className="text-[#78716c] hover:text-[#292524] text-xs px-1.5 py-0.5 rounded hover:bg-[#d8cab4] transition-colors cursor-pointer font-bold"
+              title="Clear selection"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
 
       <AddTorrentModal 
         isOpen={isModalOpen} 

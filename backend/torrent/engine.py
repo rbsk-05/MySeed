@@ -82,10 +82,32 @@ class TorrentEngine:
     def remove_torrent(self, info_hash: str, delete_files: bool = False):
         handle = self.get_torrent(info_hash)
         if handle:
-            options = self.session.delete_files if delete_files else 0
+            file_paths = []
+            if delete_files:
+                try:
+                    ti = handle.torrent_file()
+                    sp = handle.status().save_path
+                    if ti and sp:
+                        for i in range(ti.num_files()):
+                            file_paths.append(os.path.join(sp, ti.files().file_path(i)))
+                except Exception:
+                    pass
+            options = (self.session.delete_files | getattr(self.session, 'delete_partfile', 2)) if delete_files else 0
             self.session.remove_torrent(handle, options)
             if info_hash in self.torrents:
                 del self.torrents[info_hash]
+            
+            # Ensure physical removal of any remaining files on disk
+            if delete_files and file_paths:
+                for fp in file_paths:
+                    try:
+                        if os.path.isfile(fp):
+                            os.remove(fp)
+                        elif os.path.isdir(fp):
+                            import shutil
+                            shutil.rmtree(fp, ignore_errors=True)
+                    except Exception:
+                        pass
 
     def get_status(self, info_hash: str):
         handle = self.get_torrent(info_hash)

@@ -35,3 +35,14 @@ export const resumeTorrent = async (id: number): Promise<Torrent> => {
 export const removeTorrent = async (id: number, deleteFiles: boolean = false): Promise<void> => {
   await apiClient.delete(`/torrents/${id}?delete_files=${deleteFiles}`);
 };
+
+export const bulkDeleteTorrents = async (ids: number[], deleteFiles: boolean = false): Promise<{ deleted: number[]; count: number }> => {
+  try {
+    const { data } = await apiClient.post('/torrents/bulk-delete', { ids, delete_files: deleteFiles });
+    return data;
+  } catch (err) {
+    // Robust parallel fallback via individual DELETE /torrents/{id}?delete_files=...
+    await Promise.all(ids.map(id => removeTorrent(id, deleteFiles)));
+    return { deleted: ids, count: ids.length };
+  }
+};

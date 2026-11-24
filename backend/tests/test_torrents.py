@@ -49,3 +49,21 @@ def test_torrent_lifecycle(client):
     # 5. Verify deleted from list
     all_torrents = client.get("/api/torrents").json()
     assert not any(t["id"] == torrent_id for t in all_torrents)
+
+def test_bulk_delete_torrents(client):
+    # Add two torrents
+    magnet1 = "magnet:?xt=urn:btih:da39a3ee5e6b4b0d3255bfef95601890afd80709&dn=test1"
+    magnet2 = "magnet:?xt=urn:btih:e3b0c44298fc1c149afbf4c8996fb92427ae41e4&dn=test2"
+    t1 = client.post("/api/torrents/magnet", data={"magnet_uri": magnet1}).json()
+    t2 = client.post("/api/torrents/magnet", data={"magnet_uri": magnet2}).json()
+
+    # Bulk delete both
+    resp = client.post("/api/torrents/bulk-delete", json={"ids": [t1["id"], t2["id"]], "delete_files": False})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert t1["id"] in data["deleted"]
+    assert t2["id"] in data["deleted"]
+
+    # Verify both deleted
+    all_torrents = client.get("/api/torrents").json()
+    assert not any(t["id"] in [t1["id"], t2["id"]] for t in all_torrents)

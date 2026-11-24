@@ -2,7 +2,7 @@ import os
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "Personal Torrent Downloader"
+    PROJECT_NAME: str = "MySeed"
     API_V1_STR: str = "/api"
     
     # SQLite Database

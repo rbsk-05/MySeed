@@ -69,19 +69,19 @@ def main():
         pass
 
     try:
-        os.system("title CineTorrent Launcher")
+        os.system("title MySeed Launcher")
     except Exception:
         pass
 
     print("=" * 62, flush=True)
-    print("            CineTorrent: The Screening Room", flush=True)
+    print("                      MySeed", flush=True)
     print("=" * 62, flush=True)
 
     server_proc = None
     if is_server_ready(8000):
-        print("\n[1/3] Engine is already running on port 8000.")
+        print("\n[1/3] MySeed engine is already running on port 8000.", flush=True)
     else:
-        print("\n[1/3] Starting CineTorrent engine on port 8000...")
+        print("\n[1/3] Starting MySeed engine on port 8000...", flush=True)
         server_cmd = [sys.executable, "-m", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
         server_proc = subprocess.Popen(
             server_cmd,
@@ -98,22 +98,22 @@ def main():
             time.sleep(0.3)
 
         if not ready:
-            print("\n[ERROR] Engine failed to start.")
+            print("\n[ERROR] MySeed engine failed to start.", flush=True)
             if server_proc:
                 server_proc.terminate()
             input("\nPress Enter to exit...")
             return
 
-    print("[2/3] CineTorrent engine is LIVE and healthy!")
+    print("[2/3] MySeed engine is LIVE and healthy!", flush=True)
     local_ip = get_local_ip()
 
     # Automatically launch Google Chrome directly into the app (0 latency, 0 passwords!)
-    print("[3/3] Opening Google Chrome directly to CinéTorrent...")
+    print("[3/3] Opening Google Chrome directly to MySeed...", flush=True)
     open_browser("http://localhost:8000")
 
-    print("\n" + "=" * 62)
-    print("   CineTorrent is ready! Chrome opened automatically.")
-    print("=" * 62)
+    print("\n" + "=" * 62, flush=True)
+    print("   MySeed is ready! Chrome opened automatically.", flush=True)
+    print("=" * 62, flush=True)
     print(f"\nThis Computer:          http://localhost:8000")
     print(f"Phone / Home Wi-Fi:     http://{local_ip}:8000  (Zero passwords needed)")
     print("\n------------------------------------------------------------")

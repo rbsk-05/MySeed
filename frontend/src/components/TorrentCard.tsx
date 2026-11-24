@@ -6,6 +6,9 @@ interface TorrentCardProps {
   onPause: (id: number) => void;
   onResume: (id: number) => void;
   onRemove: (id: number) => void;
+  variant?: 'default' | 'compact';
+  isSelected?: boolean;
+  onToggleSelect?: (id: number) => void;
 }
 
 const formatBytes = (bytes: number, decimals = 1) => {
@@ -36,52 +39,57 @@ const hasActualError = (error?: string): boolean => {
   return true;
 };
 
-// Compact Vintage 35mm Projector Playhead
+// Compact Vintage 35mm Projector Playhead with Pixel-Perfect Integrated Light Beam
 const CinemaProjectorSVG = ({ 
   isRolling, 
-  isCompleted, 
   isPaused 
 }: { 
   isRolling: boolean; 
-  isCompleted: boolean; 
   isPaused: boolean; 
 }) => (
-  <div className="relative flex items-center justify-center select-none">
-    {/* Amber Light Beam casting onto filmstrip */}
-    {isRolling && (
-      <div 
-        className="absolute left-4 top-1/2 -translate-y-1/2 w-6 h-3.5 pointer-events-none opacity-80"
-        style={{
-          background: 'radial-gradient(ellipse at left, rgba(254, 240, 138, 0.85) 0%, rgba(254, 240, 138, 0.2) 65%, transparent 100%)',
-          clipPath: 'polygon(0 35%, 100% 0, 100% 100%, 0 65%)'
-        }}
-      />
-    )}
+  <div className="relative flex items-center justify-center select-none pointer-events-none">
     <svg 
-      viewBox="0 0 32 20" 
-      className={`w-6 h-4 drop-shadow-xs transition-all duration-300 ${
-        isRolling ? 'projector-slide-rolling' : isCompleted ? 'scale-105' : ''
+      viewBox="0 0 52 22" 
+      className={`w-10 h-4.5 drop-shadow-xs transition-all duration-300 ${
+        isRolling ? 'projector-slide-rolling' : ''
       }`}
       fill="none" 
       xmlns="http://www.w3.org/2000/svg"
     >
+      <defs>
+        <linearGradient id="projectorLightBeam" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor="#fef08a" stopOpacity="0.9" />
+          <stop offset="60%" stopColor="#fef08a" stopOpacity="0.3" />
+          <stop offset="100%" stopColor="#fef08a" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+
+      {/* Amber Light Beam emanating seamlessly from lens barrel */}
+      {isRolling && (
+        <polygon 
+          points="28,10.5 50,6.5 50,20.5 28,16.5" 
+          fill="url(#projectorLightBeam)" 
+          className="pointer-events-none" 
+        />
+      )}
+
       {/* Left Reel */}
-      <circle cx="8" cy="5" r="4" fill="#18181b" stroke={isCompleted ? "#16a34a" : isPaused ? "#78716c" : "#ea580c"} strokeWidth="1" />
-      <circle cx="8" cy="5" r="1.5" fill="#facc15" />
+      <circle cx="8" cy="5.5" r="4" fill="#18181b" stroke={isPaused ? "#78716c" : "#ea580c"} strokeWidth="1" />
+      <circle cx="8" cy="5.5" r="1.5" fill="#facc15" />
       
       {/* Right Reel */}
-      <circle cx="18" cy="5" r="4" fill="#18181b" stroke={isCompleted ? "#16a34a" : isPaused ? "#78716c" : "#ea580c"} strokeWidth="1" />
-      <circle cx="18" cy="5" r="1.5" fill="#facc15" />
+      <circle cx="18" cy="5.5" r="4" fill="#18181b" stroke={isPaused ? "#78716c" : "#ea580c"} strokeWidth="1" />
+      <circle cx="18" cy="5.5" r="1.5" fill="#facc15" />
 
       {/* Projector Body */}
-      <rect x="4" y="8" width="18" height="10" rx="1.5" fill="#292524" stroke="#1c1917" strokeWidth="1" />
+      <rect x="4" y="8" width="18" height="11" rx="1.5" fill="#292524" stroke="#1c1917" strokeWidth="1" />
       
       {/* Transport Knob */}
-      <circle cx="13" cy="13" r="2" fill="#57534e" />
+      <circle cx="13" cy="13.5" r="2" fill="#57534e" />
 
       {/* Lens Barrel */}
-      <path d="M22 10.5L27 9L27 17L22 15.5Z" fill="#57534e" stroke="#1c1917" strokeWidth="1" />
-      <line x1="27" y1="9" x2="27" y2="17" stroke="#fef08a" strokeWidth="1.5" />
+      <path d="M22 11L28 9.5L28 17.5L22 16Z" fill="#57534e" stroke="#1c1917" strokeWidth="1" />
+      <line x1="28" y1="9.5" x2="28" y2="17.5" stroke="#fef08a" strokeWidth="1.5" strokeLinecap="round" />
     </svg>
   </div>
 );
@@ -90,13 +98,111 @@ export const TorrentCard: React.FC<TorrentCardProps> = ({
   torrent, 
   onPause, 
   onResume, 
-  onRemove 
+  onRemove,
+  variant = 'default',
+  isSelected = false,
+  onToggleSelect
 }) => {
   const isPaused = torrent.is_paused || torrent.status === 'paused';
   const isCompleted = torrent.progress >= 100 || torrent.status === 'finished' || torrent.status === 'seeding';
   const progressPercent = Math.min(100, Math.max(0, torrent.progress)).toFixed(1);
   const numProgress = parseFloat(progressPercent);
   const isActivelyRolling = !isPaused && !isCompleted && torrent.download_speed > 0;
+
+  // Distinct Compact Card Ratio for completed items in "All Titles"
+  if (variant === 'compact') {
+    return (
+      <div className={`chill-card p-3 transition-all duration-200 hover:shadow-xs flex flex-col justify-between bg-[#fffdf9] border border-[#e8dfd1] rounded-2xl h-full ${
+        isSelected ? 'ring-2 ring-[#ea580c] bg-[#fffbf5]' : ''
+      }`}>
+        {/* Top: Checkbox, Title & Action Controls */}
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+            {onToggleSelect && (
+              <input 
+                type="checkbox"
+                checked={isSelected}
+                onChange={() => onToggleSelect(torrent.id)}
+                className="w-3.5 h-3.5 rounded border-[#d6cbb9] text-[#ea580c] focus:ring-0 cursor-pointer accent-[#ea580c] shrink-0"
+                title="Select for bulk action"
+              />
+            )}
+            <span className="text-xs select-none" title="Ready to Screen">🍿</span>
+            <h3 className="text-xs sm:text-sm font-bold text-[#292524] truncate" title={torrent.name}>
+              {torrent.name || 'Untitled Torrent'}
+            </h3>
+          </div>
+
+          <div className="flex items-center gap-1 shrink-0">
+            {isPaused ? (
+              <button 
+                onClick={() => onResume(torrent.id)}
+                className="chill-btn bg-[#dcfce7] text-[#15803d] border-[#86efac] hover:bg-[#bbf7d0] text-[10px] py-0.5 px-2 font-semibold"
+                title="Resume"
+              >
+                Resume
+              </button>
+            ) : (
+              <button 
+                onClick={() => onPause(torrent.id)}
+                className="chill-btn text-[#78716c] hover:text-[#292524] text-[10px] py-0.5 px-2 font-semibold"
+                title="Pause"
+              >
+                Pause
+              </button>
+            )}
+            <button 
+              onClick={() => onRemove(torrent.id)}
+              className="chill-btn text-[#b91c1c] hover:bg-[#fee2e2] hover:border-[#fca5a5] text-[10px] py-0.5 px-1.5 font-bold"
+              title="Remove"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
+        {/* Mini 35mm Celluloid Completed Filmstrip */}
+        <div className="my-1.5">
+          <div className="filmstrip-track h-2.5 rounded-sm relative shadow-inner overflow-hidden">
+            {/* Top Sprockets */}
+            <div className="absolute top-0 inset-x-0 h-0.5 filmstrip-sprockets pointer-events-none opacity-60" />
+            
+            {/* 100% Finished Film Frame */}
+            <div className="h-full rounded-sm bg-gradient-to-r from-[#15803d] to-[#22c55e] w-full relative">
+              <div 
+                className="absolute inset-0 opacity-20"
+                style={{
+                  backgroundImage: 'repeating-linear-gradient(90deg, #000000 0px, #000000 1px, transparent 1px, transparent 16px)'
+                }}
+              />
+            </div>
+
+            {/* Bottom Sprockets */}
+            <div className="absolute bottom-0 inset-x-0 h-0.5 filmstrip-sprockets pointer-events-none opacity-60" />
+          </div>
+        </div>
+
+        {/* Bottom Details: Upload Speed, Seeds/Peers, Total Size */}
+        <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-[#f0ebe1] text-[11px] font-mono text-[#78716c]">
+          <div className="flex items-center gap-2 truncate">
+            {torrent.upload_speed > 0 ? (
+              <span className="text-[#0369a1] font-bold">
+                ↑ {formatBytes(torrent.upload_speed)}/s
+              </span>
+            ) : (
+              <span className="text-[#16a34a] font-semibold">Ready</span>
+            )}
+            <span>•</span>
+            <span>{torrent.seeds || 0}s / {torrent.peers || 0}p</span>
+          </div>
+
+          <div className="bg-[#f5f0e8] px-1.5 py-0.5 rounded border border-[#e8dfd1] text-[#292524] font-bold shrink-0">
+            {formatBytes(torrent.size || torrent.downloaded || 0)}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Status Badge Logic (Clean, no emojis; "Ready to Screen" label removed)
   const getStatusBadge = () => {
@@ -144,10 +250,21 @@ export const TorrentCard: React.FC<TorrentCardProps> = ({
   };
 
   return (
-    <div className="chill-card p-3 sm:p-3.5 mb-2.5 transition-all duration-200 hover:shadow-xs">
-      {/* Top Row: Title, Inline Status Badge, and Action Buttons (Space-optimized) */}
+    <div className={`chill-card p-3 sm:p-3.5 mb-2.5 transition-all duration-200 hover:shadow-xs ${
+      isSelected ? 'ring-2 ring-[#ea580c] bg-[#fffbf5]' : ''
+    }`}>
+      {/* Top Row: Checkbox, Title, Inline Status Badge, and Action Buttons (Space-optimized) */}
       <div className="flex items-center justify-between gap-2.5 mb-2">
         <div className="flex items-center gap-2 min-w-0 flex-1">
+          {onToggleSelect && (
+            <input 
+              type="checkbox"
+              checked={isSelected}
+              onChange={() => onToggleSelect(torrent.id)}
+              className="w-4 h-4 rounded border-[#d6cbb9] text-[#ea580c] focus:ring-0 cursor-pointer accent-[#ea580c] shrink-0"
+              title="Select for bulk action"
+            />
+          )}
           <h3 className="text-sm sm:text-base font-bold text-[#292524] truncate" title={torrent.name}>
             {torrent.name || 'Untitled Torrent'}
           </h3>
@@ -226,20 +343,21 @@ export const TorrentCard: React.FC<TorrentCardProps> = ({
             }`}
           />
 
-          {/* Sliding Cinema Projector Playhead */}
-          <div 
-            className="absolute top-1/2 -translate-y-1/2 pointer-events-none transition-all duration-300 z-20"
-            style={{ 
-              left: `${Math.max(2, Math.min(96, numProgress))}%`,
-              transform: 'translate(-50%, -50%)'
-            }}
-          >
-            <CinemaProjectorSVG 
-              isRolling={isActivelyRolling} 
-              isCompleted={isCompleted} 
-              isPaused={isPaused} 
-            />
-          </div>
+          {/* Sliding Cinema Projector Playhead (travels towards the end; disappears once downloaded) */}
+          {!isCompleted && (
+            <div 
+              className="absolute top-1/2 pointer-events-none transition-all duration-300 z-20"
+              style={{ 
+                left: `${Math.max(2, Math.min(98, numProgress))}%`,
+                transform: 'translate(-50%, -42%)'
+              }}
+            >
+              <CinemaProjectorSVG 
+                isRolling={isActivelyRolling} 
+                isPaused={isPaused} 
+              />
+            </div>
+          )}
 
           {/* Popcorn Milestone at end of progress bar */}
           <div 

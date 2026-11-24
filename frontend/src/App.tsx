@@ -168,7 +168,7 @@ function AppContent() {
             onClick={() => setCurrentView('dashboard')}
           >
             <span className="font-extrabold text-xl text-[#292524] tracking-tight">
-              Ciné<span className="text-[#ea580c]">Torrent</span>
+              My<span className="text-[#ea580c]">Seed</span>
             </span>
           </div>
 
